@@ -74,6 +74,29 @@
 
       <h1 class="orderhistory-title">Your Order History</h1>
 
+      <div class="orderhistory-controls">
+        <div class="sort-group">
+            <label for="sortOrders">Order By:</label>
+            <select id="sortOrders">
+                <option value="date-desc">Latest Date</option>
+                <option value="date-asc">Oldest Date</option>
+                <option value="order-desc">Highest Order Number</option>
+                <option value="order-asc">Lowest Order Number</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="priceFilter">Filter Price:</label>
+            <select id="priceFilter">
+                <option value="all">All</option>
+                <option value="0-500">₱0 - ₱500</option>
+                <option value="501-1000">₱501 - ₱1,000</option>
+                <option value="1001-5000">₱1,001 - ₱5,000</option>
+                <option value="5001+">₱5,001+</option>
+            </select>
+        </div>
+      </div>
+
       <div class="orderhistory-list" id="orderHistoryContainer">
         <!-- ORDER 1 Card -->
         <!-- <div class="orderhistory-card">

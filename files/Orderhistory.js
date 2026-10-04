@@ -1,4 +1,5 @@
 let ordersData = [];
+let filteredOrders = [];
 
 function showLoader(show = true) {
     const loader = document.getElementById("loadingOverlay");
@@ -61,6 +62,126 @@ document.getElementById("refundForm")
             closeRefundModal();
     });
 
+document.addEventListener("change", event => {
+    if (event.target.id === "sortOrders" || event.target.id === "priceFilter") {
+        applySortAndFilter();
+    }
+});
+
+function applySortAndFilter() {
+
+    const sortValue = document.getElementById("sortOrders").value;
+    const priceFilter = document.getElementById("priceFilter").value;
+
+    filteredOrders = [...ordersData];
+
+    // PRICE FILTER
+    if (priceFilter !== "all") {
+        filteredOrders = filteredOrders.filter(order => {
+
+            const total = Number(order.Total_cost);
+            switch (priceFilter) {
+
+                case "0-500":
+                    return total <= 500;
+
+                case "501-1000":
+                    return total >= 501 && total <= 1000;
+
+                case "1001-5000":
+                    return total >= 1001 && total <= 5000;
+
+                case "5001+":
+                    return total >= 5001;
+
+                default:
+                    return true;
+            }
+        });
+    }
+
+    // SORTING
+    switch (sortValue) {
+
+        case "date-desc":
+            filteredOrders.sort(
+                (a, b) =>
+                    new Date(b.Order_date)
+                    - new Date(a.Order_date)
+            );
+            break;
+
+        case "date-asc":
+            filteredOrders.sort(
+                (a, b) =>
+                    new Date(a.Order_date)
+                    - new Date(b.Order_date)
+            );
+            break;
+
+        case "order-desc":
+            filteredOrders.sort(
+                (a, b) =>
+                    b.Order_id - a.Order_id
+            );
+            break;
+
+        case "order-asc":
+            filteredOrders.sort(
+                (a, b) =>
+                    a.Order_id - b.Order_id
+            );
+            break;
+    }
+    renderOrders(filteredOrders);
+}
+
+function renderOrders(orders) {
+
+    const container = document.getElementById("orderHistoryContainer");
+    container.innerHTML = "";
+
+    orders.forEach(order => {
+        const card = document.createElement("div");
+        card.className = "orderhistory-card";
+        card.innerHTML = `
+            <div class="order-card-header">
+                <strong>
+                    Order #${order.Order_id}
+                </strong>
+                <span>
+                    ${new Date(order.Order_date).toLocaleDateString()}
+                </span>
+            </div>
+
+            <div class="order-card-body">
+                <div class="order-status">
+                    <p>
+                        Status:
+                        <strong>
+                            [${order.Order_status}]
+                        </strong>
+                    </p>
+
+                    <p>
+                        Order Total:
+                        ₱${Number(order.Total_cost).toFixed(2)}
+                    </p>
+                </div>
+
+                <div class="order-actions">
+                    <button
+                        class="track-order-btn"
+                        data-order-id="${order.Order_id}">
+                        Track Order
+                    </button>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
 async function loadOrders() {
     const container = document.getElementById("orderHistoryContainer");
 
@@ -72,7 +193,8 @@ async function loadOrders() {
         }
 
         ordersData = await response.json();
-        console.log("Orders:", ordersData);
+        filteredOrders = [...ordersData];
+
         container.innerHTML = "";
         if (!ordersData.length) {
             container.innerHTML = `
@@ -86,52 +208,7 @@ async function loadOrders() {
             return;
         }
 
-        ordersData.forEach(order => {
-            const card = document.createElement("div");
-            card.className = "orderhistory-card";
-            card.innerHTML = `
-                <div class="order-card-header">
-                    <strong>
-                        Order #${order.Order_id}
-                    </strong>
-                    <span>
-                        ${new Date(order.Order_date).toLocaleDateString()}
-                    </span>
-                </div>
-                <div class="order-card-body">
-
-                    <div class="order-status">
-
-                        <p>
-                            Status:
-                            <strong>
-                                [${order.Order_status}]
-                            </strong>
-                        </p>
-
-                        <p>
-                            Order Total:
-                            ₱${Number(order.Total_cost).toFixed(2)}
-                        </p>
-
-                    </div>
-
-                    <div class="order-actions">
-
-                        <button
-                            class="track-order-btn"
-                            data-order-id="${order.Order_id}"
-                        >
-                            Track Order
-                        </button>
-
-                    </div>
-
-                </div>
-            `;
-
-            container.appendChild(card);
-        });
+        renderOrders(ordersData);
 
     } catch (error) {
 

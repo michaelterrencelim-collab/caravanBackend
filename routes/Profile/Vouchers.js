@@ -28,12 +28,8 @@ router.get("/me", checkAuth("user"), async (req, res) => {
                 INNER JOIN Vouchers v
                     ON cv.Voucher_id = v.Voucher_id
                 WHERE cv.Customer_id = ?
-                ORDER BY
-                    CASE
-                        WHEN cv.Voucher_status = 'Unused' THEN 0
-                        ELSE 1
-                    END,
-                    v.Voucher_id
+                AND cv.Voucher_status = 'Unused'
+                ORDER BY v.Voucher_id
             `,
             args: [customerId]
         });

@@ -99,12 +99,33 @@ body {
 .orderhistory-container {
   width: 100%;
   max-width: 1100px;
-
   margin: 0px auto 50px;
-
   padding: 20px 30px;
-
   box-sizing: border-box;
+}
+
+.orderhistory-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.orderhistory-controls label {
+    font-family: EncodeSans_GC, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.orderhistory-controls select {
+    padding: 8px 12px;
+    border: 2px solid var(--color-primary);
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
 }
 
 .orderhistory-title {
@@ -119,8 +140,8 @@ body {
 
 .orderhistory-list {
   height: 500px;
-  background-color: var(--color-secondary);
-  border-radius: 5px;
+  background-color: #ece1d5;
+  border-radius: 10px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
   border: 3px solid var(--color-primary);
   display: flex;
@@ -179,13 +200,9 @@ body {
 
 .order-card-body {
   display: grid;
-
   grid-template-columns: 2fr 1.5fr 1fr;
-
   align-items: center;
-
   gap: 25px;
-
   padding: 18px 20px 10px;
 }
 
@@ -723,10 +740,9 @@ body {
   }
 
   .order-card-body {
-    grid-template-columns: 1fr;
-
+    display: flex;
+    flex-direction: column;
     gap: 15px;
-
     padding: 15px;
   }
 
@@ -740,13 +756,12 @@ body {
   }
 
   .order-status {
-    margin-left: 105px;
+    margin-left: 0;
   }
 
   .order-actions {
+    margin-left: 0;
     align-items: flex-start;
-
-    margin-left: 105px;
   }
 
   .order-progress {
