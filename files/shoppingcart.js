@@ -754,21 +754,23 @@ function decreaseQuantity(index) {
 
         if (cartItem.isBundle) {
             const bundleId = Number(itemCard.dataset.bundleId);
+
             const bundle = bundlesData.find(
-                b => b.bundle_id === bundleId
+                b => Number(b.product_id) === bundleId
             );
 
             if (bundle) {
                 const sizeMultiplier =
-                    cartItem.cartprod_size === "16oz" ? 16 : 8;
+                    cartItem.cartprod_size === "16oz"
+                        ? 16
+                        : 8;
 
                 const itemPrice =
-                    bundle.product_price *
+                    Number(bundle.product_price) *
                     sizeMultiplier *
                     quantity;
 
-                priceElement.textContent =
-                    `Price: ₱${itemPrice.toFixed(2)}`;
+                priceElement.textContent = `Price: ₱${itemPrice.toFixed(2)}`;
             }
         } else {
             const productId = Number(itemCard.dataset.productId);
@@ -914,10 +916,25 @@ function updatePriceSummary() {
     let discount = 0;
 
     if (selectedVoucher) {
-        discount = totalProductCost * (selectedVoucher.discount / 100);
+        const discountPercentage =
+            Number(selectedVoucher.discount) || 0;
+
+        discount =
+            totalProductCost *
+            (discountPercentage / 100);
+
+        discount = Math.min(
+            discount,
+            totalProductCost
+        );
     }
 
-    const totalCost = totalProductCost + shippingFee - discount;
+    const totalCost = Math.max(
+        0,
+        totalProductCost +
+        shippingFee -
+        discount
+    );
 
     // Update the price breakdown display
     const priceBreakdown = document.querySelector(".price-breakdown");
@@ -926,7 +943,7 @@ function updatePriceSummary() {
         if (priceRows.length >= 3) {
             priceRows[0].innerHTML = `<span>Products Cost:</span><span>₱${totalProductCost.toFixed(2)}</span>`;
             priceRows[1].innerHTML = `<span>Shipping Fee:</span><span>₱${shippingFee.toFixed(2)}</span>`;
-            priceRows[2].innerHTML = `<span>Discount:</span><span>₱${discount.toFixed(2)}</span>`;
+            priceRows[2].innerHTML = `<span>Discount:</span><span>-₱${discount.toFixed(2)}</span>`;
         }
 
         const totalRow = priceBreakdown.querySelector(".total-row");
@@ -942,7 +959,7 @@ document.addEventListener("click", function(event) {
             window.location.href = "/store";
         }
         if (event.target.id === "viewOrdersBtn") {
-            window.location.href = "/user/orders";
+            window.location.href = "/user/order";
         }
     }
 );
