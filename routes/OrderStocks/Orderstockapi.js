@@ -2,21 +2,21 @@ const express = require("express");
 const router = express.Router();
 const db = require("../../imports/database");
 const { requireAuth } = require("../../imports/token");
-const { logAudit, getAdminId } = require("./auditApi");
+const { logAudit, getAdminId } = require("../Audit/AuditImport");
 
 // Mounted at /admin/api  (e.g. GET /admin/api/orders, GET /admin/api/stocks)
 router.customPath = "/admin/api";
 
 // Tables used (from your ERD):
-//   Orders, Order_items, Order_status, Customer, Address, Payment_method, Vouchers
+//   Orders, Order_items, Order_status, Customer, Address, Payment_method
 //   Product, Stock_adjustments, Returns
-// Voucher/discount data is read in the order DETAIL endpoint only.
-// It is intentionally NOT part of the orders list.
 
 // ---------------------------------------------------------------------------
 // CONFIG
 // ---------------------------------------------------------------------------
 const LOW_STOCK_THRESHOLD = 20; // amount <= this (and > 0) = "Low on Stock"
+const STATUS_RETURNED = "Returned"; // must match a row in Order_status
+const STATUS_REFUNDED = "Refunded"; // must match a row in Order_status
 const RETURN_STATUS_DEFAULT = "Received"; // value written to Returns.return_status
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 100;
@@ -68,7 +68,8 @@ router.get("/order-statuses", requireAuth("admin"), async (req, res) => {
 //   sort   : date-desc | date-asc | total-desc | total-asc | id-desc | id-asc
 router.get("/orders", requireAuth("admin"), async (req, res) => {
   try {
-    const { status, search, from, to, sort } = req.query;
+    const { status, customer, search, from, to, sort } = req.query;
+    const fetchAll = req.query.all === "true"; // report mode: no paging (capped at 5000)
     const { page, limit, offset } = getPaging(req.query);
 
     const where = [];
@@ -77,6 +78,10 @@ router.get("/orders", requireAuth("admin"), async (req, res) => {
     if (status) {
       where.push("o.Status_id = ?");
       args.push(Number(status));
+    }
+    if (customer) {
+      where.push("o.Customer_id = ?");
+      args.push(Number(customer));
     }
     if (search) {
       const like = likeParam(search);
@@ -119,7 +124,6 @@ router.get("/orders", requireAuth("admin"), async (req, res) => {
     });
     const total = Number(countResult.rows[0].total);
 
-    // NOTE: no voucher/discount columns in the list on purpose
     const result = await db.execute({
       sql: `
         SELECT
@@ -139,9 +143,9 @@ router.get("/orders", requireAuth("admin"), async (req, res) => {
         LEFT JOIN Customer c ON o.Customer_id = c.Customer_id
         ${whereSql}
         ORDER BY ${orderBy}
-        LIMIT ? OFFSET ?
+        ${fetchAll ? "LIMIT 5000" : "LIMIT ? OFFSET ?"}
       `,
-      args: [...args, limit, offset],
+      args: fetchAll ? args : [...args, limit, offset],
     });
 
     res.json({
@@ -157,7 +161,7 @@ router.get("/orders", requireAuth("admin"), async (req, res) => {
   }
 });
 
-// GET /admin/api/orders/:orderId -> full order (customer, address, payment, voucher, items)
+// GET /admin/api/orders/:orderId -> full order (customer, address, payment, items)
 router.get("/orders/:orderId", requireAuth("admin"), async (req, res) => {
   try {
     const orderId = Number(req.params.orderId);
@@ -185,10 +189,6 @@ router.get("/orders/:orderId", requireAuth("admin"), async (req, res) => {
 
           pm.Payment_method AS Payment_method,
 
-          v.Voucher_id,
-          v.Voucher_name,
-          v.discount AS Voucher_discount,
-
           oi.Order_item_id,
           oi.Product_id,
           oi.Product_Size,
@@ -207,7 +207,6 @@ router.get("/orders/:orderId", requireAuth("admin"), async (req, res) => {
         LEFT JOIN Customer c ON o.Customer_id = c.Customer_id
         LEFT JOIN Address a ON o.Address_id = a.Address_id
         LEFT JOIN Payment_method pm ON o.Method_id = pm.Method_id
-        LEFT JOIN Vouchers v ON o.Voucher_id = v.Voucher_id
         INNER JOIN Order_items oi ON o.Order_id = oi.Order_id
         INNER JOIN Product p ON oi.Product_id = p.Product_id
         WHERE o.Order_id = ?
@@ -234,11 +233,6 @@ router.get("/orders/:orderId", requireAuth("admin"), async (req, res) => {
     const shipping = Number(first.Shipping_fee) || 0;
     const total = Number(first.Total_cost) || 0;
 
-    // Works whether the voucher is a % or a fixed amount, because it is derived
-    // from what was actually charged: subtotal + shipping - total.
-    // Assumes Total_cost = subtotal + Shipping_fee - discount.
-    const discountAmount = Math.max(0, round2(subtotal + shipping - total));
-
     res.json({
       Order_id: first.Order_id,
       Order_date: first.Order_date,
@@ -256,12 +250,8 @@ router.get("/orders/:orderId", requireAuth("admin"), async (req, res) => {
         Zip_code: first.Zip_code,
       },
       Payment_method: first.Payment_method || null,
-      Voucher: first.Voucher_id
-        ? { Voucher_id: first.Voucher_id, name: first.Voucher_name, discount: first.Voucher_discount }
-        : null,
       Subtotal: subtotal,
       Shipping_fee: shipping,
-      Discount_amount: discountAmount,
       Total_cost: total,
       items,
     });
@@ -317,6 +307,116 @@ router.patch("/orders/:orderId/status", requireAuth("admin"), async (req, res) =
     res.status(500).json({ error: "Unable to update order status" });
   }
 });
+
+// GET /admin/api/order-summary -> order count and money per status (Orders Reports header cards)
+router.get("/order-summary", requireAuth("admin"), async (req, res) => {
+  try {
+    const result = await db.execute(`
+      SELECT
+        os.Status_id,
+        os.Order_status,
+        COUNT(o.Order_id) AS order_count,
+        COALESCE(SUM(o.Total_cost), 0) AS total_amount
+      FROM Order_status os
+      LEFT JOIN Orders o ON o.Status_id = os.Status_id
+      GROUP BY os.Status_id, os.Order_status
+      ORDER BY os.Status_id
+    `);
+    const statuses = result.rows.map((r) => ({
+      Status_id: r.Status_id,
+      Order_status: r.Order_status,
+      order_count: Number(r.order_count),
+      total_amount: round2(r.total_amount),
+    }));
+    res.json({
+      totalOrders: statuses.reduce((n, s) => n + s.order_count, 0),
+      statuses,
+    });
+  } catch (error) {
+    console.error("Error loading order summary:", error);
+    res.status(500).json({ error: "Unable to load order summary" });
+  }
+});
+
+// Shared logic for "set this order to a named status" (return / refund).
+// The target status is looked up by NAME in the Order_status table, so the
+// row must exist there (e.g. Status_id 6 = "Returned", 7 = "Refunded").
+async function setOrderStatusByName(req, res, { targetName, blockedFrom }) {
+  try {
+    const orderId = Number(req.params.orderId);
+    if (!Number.isInteger(orderId)) return res.status(400).json({ error: "Invalid order id" });
+
+    const current = await db.execute({
+      sql: `
+        SELECT o.Status_id, os.Order_status
+        FROM Orders o
+        INNER JOIN Order_status os ON o.Status_id = os.Status_id
+        WHERE o.Order_id = ?
+      `,
+      args: [orderId],
+    });
+    if (!current.rows.length) return res.status(404).json({ error: "Order not found" });
+
+    const oldStatus = current.rows[0].Order_status;
+    if (blockedFrom.some((n) => n.toLowerCase() === String(oldStatus).toLowerCase())) {
+      return res.status(409).json({ error: `Order #${orderId} is already ${oldStatus}` });
+    }
+
+    const target = await db.execute({
+      sql: "SELECT Status_id, Order_status FROM Order_status WHERE LOWER(Order_status) = LOWER(?)",
+      args: [targetName],
+    });
+    if (!target.rows.length) {
+      return res.status(409).json({
+        error: `The Order_status table has no "${targetName}" row. Add it first, then retry.`,
+      });
+    }
+
+    const { Status_id: targetId, Order_status: targetLabel } = target.rows[0];
+
+    await db.execute({
+      sql: "UPDATE Orders SET Status_id = ? WHERE Order_id = ?",
+      args: [targetId, orderId],
+    });
+
+    const reason = String(req.body.reason || "").trim().slice(0, 120);
+    await logAudit({
+      adminId: getAdminId(req),
+      type: "updated",
+      description:
+        `Marked Order "#${orderId}" as ${targetLabel} (was ${oldStatus})` + (reason ? `: ${reason}` : ""),
+    });
+
+    res.json({
+      message: `Order marked as ${targetLabel}`,
+      Order_id: orderId,
+      Status_id: targetId,
+      Order_status: targetLabel,
+      previous_status: oldStatus,
+    });
+  } catch (error) {
+    console.error("Error changing order status:", error);
+    res.status(500).json({ error: "Unable to update order" });
+  }
+}
+
+// POST /admin/api/orders/:orderId/return    body: { reason? }
+// Sets the order's status to "Returned".
+router.post("/orders/:orderId/return", requireAuth("admin"), (req, res) =>
+  setOrderStatusByName(req, res, {
+    targetName: STATUS_RETURNED,
+    blockedFrom: [STATUS_RETURNED, STATUS_REFUNDED],
+  })
+);
+
+// POST /admin/api/orders/:orderId/refund    body: { reason? }
+// Sets the order's status to "Refunded".
+router.post("/orders/:orderId/refund", requireAuth("admin"), (req, res) =>
+  setOrderStatusByName(req, res, {
+    targetName: STATUS_REFUNDED,
+    blockedFrom: [STATUS_REFUNDED],
+  })
+);
 
 // ---------------------------------------------------------------------------
 // STOCK INVENTORY
@@ -469,35 +569,40 @@ router.post("/stocks/:productId/adjust", requireAuth("admin"), async (req, res) 
       return res.status(400).json({ error: "Stock cannot go below 0" });
     }
 
-    // Guarded update protects against two admins editing at once
-    const update = await db.execute({
-      sql: "UPDATE Product SET Prod_amount = Prod_amount + ? WHERE product_id = ? AND Prod_amount + ? >= 0",
-      args: [delta, productId, delta],
-    });
-    if (!update.rowsAffected) {
+    // One atomic batch (one round trip on Turso). The stock update is guarded, and the
+    // Stock_adjustments + Audit inserts only run if that update changed a row
+    // (changes() = rows touched by the previous statement), so two admins editing
+    // at once can never leave the three tables out of sync.
+    const adminId = getAdminId(req);
+    const results = await db.batch(
+      [
+        {
+          sql: "UPDATE Product SET Prod_amount = Prod_amount + ? WHERE product_id = ? AND Prod_amount + ? >= 0",
+          args: [delta, productId, delta],
+        },
+        {
+          sql: `
+            INSERT INTO Stock_adjustments (product_id, Admin_id, quantity_change, Adjustment_date)
+            SELECT ?, ?, ?, CURRENT_TIMESTAMP WHERE changes() > 0
+          `,
+          args: [productId, adminId, delta],
+        },
+        {
+          sql: `
+            INSERT INTO Audit (Admin_id, action_type, description, action_date)
+            SELECT ?, 'updated', ?, CURRENT_TIMESTAMP WHERE changes() > 0
+          `,
+          args: [adminId, `Updated Stock for "${name}" from ${oldAmount} → ${oldAmount + delta}`],
+        },
+        { sql: "SELECT Prod_amount FROM Product WHERE product_id = ?", args: [productId] },
+      ],
+      "write"
+    );
+
+    if (!results[0].rowsAffected) {
       return res.status(409).json({ error: "Stock changed while you were editing. Please refresh and retry." });
     }
-
-    const adminId = getAdminId(req);
-    await db.execute({
-      sql: `
-        INSERT INTO Stock_adjustments (product_id, Admin_id, quantity_change, Adjustment_date)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-      `,
-      args: [productId, adminId, delta],
-    });
-
-    const fresh = await db.execute({
-      sql: "SELECT Prod_amount FROM Product WHERE product_id = ?",
-      args: [productId],
-    });
-    const newAmount = Number(fresh.rows[0].Prod_amount);
-
-    await logAudit({
-      adminId,
-      type: "updated",
-      description: `Updated Stock for "${name}" from ${newAmount - delta} → ${newAmount}`,
-    });
+    const newAmount = Number(results[3].rows[0].Prod_amount);
 
     res.json({
       product_id: productId,
