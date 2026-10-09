@@ -1,9 +1,157 @@
-document.addEventListener("DOMContentLoaded", () => {
+const params = new URLSearchParams(window.location.search);
+const productId =Number(params.get("productId")) || Number(params.get("bundleId"));
+
+function showLoader() {
+  document.getElementById("loadingOverlay").classList.add("active");
+}
+
+function hideLoader() {
+  document.getElementById("loadingOverlay").classList.remove("active");
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+
+    showLoader();
+    await updateNavbarLogin();
+
+    try {
+        await loadProductOverview();
+        await loadReviewSummary();
+    } finally {
+        hideLoader();
+    }
+
   // --- DOM Elements ---
   const leaveReviewBtn = document.querySelector(".leave-review-btn");
   const reviewsGrid = document.getElementById("reviewsGrid");
   const prevBtn = document.querySelectorAll(".control-btn")[0];
   const nextBtn = document.querySelectorAll(".control-btn")[1];
+
+  async function updateNavbarLogin() {
+
+    try {
+        const response = await fetch("/api/isLoggedIn");
+        const accountButton = document.getElementById("accountButton");
+
+        if (!accountButton) {
+            return;
+        }
+
+        if (!response.ok) {
+            accountButton.innerHTML = `
+                /login
+                    Login
+                </a>
+            `;
+            return;
+        }
+
+        const data = await response.json();
+        if (data.loggedIn) {
+            accountButton.innerHTML = `
+                <a class="nav-link" href="/user/profile">
+                    Profile
+                </a>
+            `;
+        }
+
+        else {
+            accountButton.innerHTML = `
+                <a class="nav-link" href="/login">
+                    Login
+                </a>
+            `;
+        }
+
+    } catch(error) {
+        console.error("Navbar login error:", error);
+        const accountButton = document.getElementById("accountButton");
+
+        if (accountButton) {
+            accountButton.innerHTML = `
+                /login
+                    Login
+                </a>
+            `;
+        }
+    }
+}
+
+  async function loadProductOverview() {
+    try {
+        const response = await fetch(`/api/fetchProducts?productId=${productId}`);
+        const products = await response.json();
+
+        if (!products.length) {
+            return;
+        }
+
+        const product =products[0];
+
+        document.getElementById("productImage").src = product.product_image;
+
+        document.getElementById(
+            "productOrigin"
+        ).innerHTML = `
+            <strong>
+                ${product.product_name}
+            </strong>
+            - Origin:
+            ${product.product_country}
+        `;
+
+        document.getElementById("productDescription").textContent = product.product_desc;
+    } catch(error) {
+        console.error("Failed to load product:", error);
+    }
+  }
+
+  async function loadReviewSummary() {
+    try {
+        const response = await fetch(`/api/reviewSummary?productId=${productId}`);
+
+        const summary = await response.json();
+        const average = Number(summary.average_rating || 0);
+        const reviewCount = Number(summary.review_count || 0);
+
+        document.getElementById(
+            "averageRating"
+        ).textContent =
+            `${average} Out of 5 Stars`;
+
+        document.getElementById(
+            "reviewCount"
+        ).textContent =
+            `Based on ${reviewCount} review${reviewCount === 1 ? "" : "s"}`;
+
+        renderAverageStars(average);
+
+    } catch(error) {
+        console.error("Review summary error: ",error);
+    }
+  }
+
+  function renderAverageStars(rating) {
+    const starContainer = document.querySelector(".hero-stars");
+
+    if (!starContainer) {
+        return;
+    }
+
+    starContainer.innerHTML = "";
+
+    const rounded = Math.round(rating);
+
+    for (let i = 1; i <= 5; i++) {
+        const star = document.createElement("i");
+        star.className =
+            i <= rounded
+                ? "fa-solid fa-star"
+                : "fa-regular fa-star";
+
+        starContainer.appendChild(star);
+    }
+  }
 
   // --- Dynamic Modal Injection ---
   const modalHTML = `
@@ -14,10 +162,6 @@ document.addEventListener("DOMContentLoaded", () => {
           <button class="close-modal" id="closeReviewModal">&times;</button>
         </div>
         <form id="reviewForm">
-          <div class="form-field-group">
-            <label for="reviewerName">Your Name</label>
-            <input type="text" id="reviewerName" class="radius-10-input" placeholder="e.g. SpiceLover" required />
-          </div>
           
           <div class="form-field-group">
             <label>Rating</label>

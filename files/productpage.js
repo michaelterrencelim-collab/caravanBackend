@@ -504,6 +504,7 @@ function goToLogin() {
 
 function goToReviews() {
     const params = new URLSearchParams(
+        showLoader(),
         window.location.search
     );
 
@@ -511,38 +512,27 @@ function goToReviews() {
     const bundleId = params.get("bundleId");
 
     if (productId) {
-        window.location.href =
-            `/user/reviews?productId=${productId}`;
+        window.location.href = `/user/reviews?productId=${productId}`;
     } else if (bundleId) {
-        window.location.href =
-            `/user/reviews?bundleId=${bundleId}`;
+        window.location.href = `/user/reviews?bundleId=${bundleId}`;
     } else {
-        window.location.href =
-            "/user/reviews";
+        window.location.href = "/user/reviews";
     }
 }
 
 async function addToWishlist() {
-    const params =
-        new URLSearchParams(
-            window.location.search
-        );
-
-    const productId =
-        Number(params.get("productId"));
-
-    const bundleId =
-        Number(params.get("bundleId"));
+    const params = new URLSearchParams(window.location.search);
+    const productId = Number(params.get("productId"));
+    const bundleId = Number(params.get("bundleId"));
 
     /*
      * Bundles and regular products both use product_id
      * in the database.
      */
-    const itemId =
+    const itemId = 
         isBundle ? bundleId : productId;
 
-    const wishlistButton =
-        document.getElementById("wishlistBtn");
+    const wishlistButton = document.getElementById("wishlistBtn");
 
     if (!itemId) {
         showWishlistModal(
@@ -704,11 +694,8 @@ function showLoginRequiredModal() {
         return;
     }
 
-    login_required_modal.style.visibility =
-        "visible";
-
-    login_required_modal.style.opacity =
-        "1";
+    login_required_modal.style.visibility = "visible";
+    login_required_modal.style.opacity = "1";
 }
 
 function closeWishlistModal() {
@@ -718,10 +705,7 @@ function closeWishlistModal() {
 
 function addtocart_confirm() {
     const sizeSelect = document.getElementById("spiceSize");
-    const params = new URLSearchParams(
-            window.location.search
-        );
-
+    const params = new URLSearchParams(window.location.search);
     const productId = Number(params.get("productId"));
     const bundleId = Number(params.get("bundleId"));
 
@@ -740,13 +724,8 @@ function addtocart_confirm() {
     addtocart_modal.style.opacity = "0";
 
     if (!itemId) {
-        console.error(
-            "No valid product or bundle ID found."
-        );
-
-        showCartErrorModal(
-            "Unable to identify this item."
-        );
+        console.error("No valid product or bundle ID found.");
+        showCartErrorModal("Unable to identify this item.");
 
         return;
     }
@@ -828,7 +807,6 @@ function addtocart_confirm() {
 }
 
 function addtocart_close() {
-        
     addtocart_modal.style.visibility = "hidden";
     addtocart_modal.style.opacity = "0";
 }
@@ -838,13 +816,8 @@ function showCartErrorModal(message) {
         return;
     }
 
-    const title = success_modal.querySelector(
-        ".warning-title"
-    );
-
-    const description = success_modal.querySelector(
-        ".warning-desc"
-    );
+    const title = success_modal.querySelector(".warning-title");
+    const description = success_modal.querySelector(".warning-desc");
 
     if (title) {
         title.textContent = "CART ERROR";

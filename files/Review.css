@@ -45,6 +45,7 @@ body {
 
 /* Announcement Banner */
 .announcement-bar {
+  display: none; /* Hidden by default */
   background-color: var(--color-gold);
   color: #FFFFFF;
   text-align: center;
@@ -58,44 +59,135 @@ body {
 }
 
 /* Navbar */
-.navbar {
-  background-color: var(--color-primary);
-  display: flex;
-  align-items: center;
-  padding: 12px 24px;
+.nav-item .nav-link {
+  color: #FFF4E9;
+  display: grid;
+  width: 130px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+
+  background: rgba(0, 0, 0, 0.3);
+
+  z-index: -1;
+  pointer-events: none;
 }
 
 #Caravan_Logo {
-  margin-right: 20px;
+  margin-top: 10px;
+  margin-left: 20px;
+  margin-bottom: 10px;
 }
 
+.navbar {
+  background-color: #6F4E37;
+}
+
+/* Allow absolute positioning relative to navbar */
+.container-fluid {
+  position: relative;
+}
+
+/* Center Home, Market, FAQs */
 .nav-center {
-  margin: 0 auto;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+
   display: flex;
+  align-items: center;
   gap: 30px;
 }
 
 .nav-right {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 30px;
 }
 
-.nav-link {
-  color: #FFF4E9;
-  text-decoration: none;
-  font-family: EncodeSans_GC_Semi, sans-serif;
-  font-size: 14px;
-  letter-spacing: 0.5px;
+/* Right navigation items */
+.nav-item2 .nav-link {
+  color: #fff4e9;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 80px;
+  font-family: EncodeSans_GC_Semi;
+  font-size: 16px;
 }
 
-.nav-link:hover {
-  color: #D3C2B5;
+.nav-item1 .nav-link {
+  color: #fff4e9;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 80px;
+  font-family: EncodeSans_GC_Semi;
+  font-size: 16px;
+}
+
+.nav-item1 .nav-link:hover {
+  color: #a9a9a9;
+}
+
+.nav-item2 .nav-link:hover {
+  color: #a9a9a9;
 }
 
 .divider {
   color: #FFF4E9;
   font-size: 14px;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.loading-overlay.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+.loading-content {
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #ddd;
+    border-top: 5px solid #6F4E37;
+    border-radius: 50%;
+    animation: loadingSpin 0.8s linear infinite;
+    margin: 0 auto 15px;
+}
+
+.loading-content p {
+    color: #6F4E37;
+    font-family: InstrumentSans_Semi;
+}
+
+@keyframes loadingSpin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Page Header */
