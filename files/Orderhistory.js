@@ -1,5 +1,6 @@
 let ordersData = [];
 let filteredOrders = [];
+let selectedRefundOrderId = null;
 
 function showLoader(show = true) {
     const loader = document.getElementById("loadingOverlay");
@@ -56,11 +57,7 @@ function closeRefundModal() {
 }
 
 document.getElementById("refundForm")
-    .addEventListener("submit", event => {
-        event.preventDefault();
-        alert("Refund requests are not available yet.");
-            closeRefundModal();
-    });
+    .addEventListener("submit", submitRefundRequest);
 
 document.addEventListener("change", event => {
     if (event.target.id === "sortOrders" || event.target.id === "priceFilter") {
@@ -252,6 +249,7 @@ async function openReceiptModal(orderId) {
         }
 
         const firstOrder = orderItems[0];
+        selectedRefundOrderId = firstOrder.Order_id;
         let productsHtml = "";
 
         orderItems.forEach(item => {
@@ -316,6 +314,58 @@ async function openReceiptModal(orderId) {
             </p>
         `;
         receiptModal.classList.add("active");
+    }
+}
+
+async function submitRefundRequest(event) {
+    event.preventDefault();
+    console.log("Submitting refund request...");
+    const reason = document
+        .getElementById("refundReason")
+        .value
+        .trim();
+
+    if (!selectedRefundOrderId) {
+        alert("Order not found.");
+        return;
+    }
+
+    if (!reason) {
+        alert("Please enter a refund reason.");
+        return;
+    }
+
+    try {
+        showLoader();
+        const response = await fetch("/returns", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                orderId: selectedRefundOrderId,
+                reason: reason
+            })
+        });
+
+        const result = await response.json();
+        hideLoader();
+
+        if (!response.ok) {
+            alert(
+                result.error ||
+                "Unable to submit refund request."
+            );
+            return;
+        }
+        alert("Refund request submitted successfully.");
+        document.getElementById("refundForm").reset();
+        closeRefundModal();
+
+    } catch (error) {
+        hideLoader();
+        console.error(error);
+        alert("An unexpected error occurred while submitting the refund request.");
     }
 }
 

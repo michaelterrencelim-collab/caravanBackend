@@ -24,12 +24,8 @@ router.customPath = "/returns";
 router.post("/", checkAuth("user"), async (req, res) => {
     try {
         const customerId = Number(req.user.userId);
-
-        const orderId =
-            Number(req.body.orderId);
-
-        const reason =
-            String(req.body.reason || "").trim();
+        const orderId = Number(req.body.orderId);
+        const reason = String(req.body.reason || "").trim();
 
         if (!customerId) {
             return res.status(401).json({
@@ -116,17 +112,13 @@ router.post("/", checkAuth("user"), async (req, res) => {
             });
         }
 
-        const order =
-            orderResult.rows[0];
-
+        const order = orderResult.rows[0];
         /*
          * Do not accept the refund amount
          * from the browser. Use the saved
          * order total instead.
          */
-        const refundAmount =
-            Number(order.Total_cost);
-
+        const refundAmount = Number(order.Total_cost);
         const result = await db.execute({
             sql: `
                 INSERT INTO Returns (
@@ -151,9 +143,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
             ]
         });
 
-        const returnId =
-            Number(result.lastInsertRowid);
-
+        const returnId = Number(result.lastInsertRowid);
         return res.status(201).json({
             success: true,
             message:
@@ -190,9 +180,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
  */
 router.get("/me", checkAuth("user"), async (req, res) => {
     try {
-        const customerId =
-            Number(req.user.userId);
-
+        const customerId = Number(req.user.userId);
         if (!customerId) {
             return res.status(401).json({
                 success: false,
@@ -230,10 +218,7 @@ router.get("/me", checkAuth("user"), async (req, res) => {
         );
 
     } catch (error) {
-        console.error(
-            "Retrieve customer refunds error:",
-            error
-        );
+        console.error("Retrieve customer refunds error: ", error);
 
         return res.status(500).json({
             success: false,
@@ -323,15 +308,10 @@ router.put(
     requireAuth("admin"),
     async (req, res) => {
         try {
-            const returnId =
-                Number(req.params.returnId);
-
-            const status =
-                String(req.body.status || "").trim();
-
+            const returnId = Number(req.params.returnId);
+            const status = String(req.body.status || "").trim();
             const allowedStatuses = [
                 "Pending",
-                "Approved",
                 "Rejected",
                 "Refunded"
             ];
@@ -386,15 +366,10 @@ router.put(
             });
 
         } catch (error) {
-            console.error(
-                "Refund status update error:",
-                error
-            );
-
+            console.error("Refund status update error: ", error);
             return res.status(500).json({
                 success: false,
-                error:
-                    "Unable to update refund status"
+                error: "Unable to update refund status"
             });
         }
     }
