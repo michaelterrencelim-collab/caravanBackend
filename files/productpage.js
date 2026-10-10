@@ -503,21 +503,20 @@ function goToLogin() {
 }
 
 function goToReviews() {
-    const params = new URLSearchParams(
-        showLoader(),
-        window.location.search
-    );
 
+    showLoader();
+
+    const params = new URLSearchParams(window.location.search);
     const productId = params.get("productId");
     const bundleId = params.get("bundleId");
+    const itemId = productId || bundleId;
 
-    if (productId) {
-        window.location.href = `/user/reviews?productId=${productId}`;
-    } else if (bundleId) {
-        window.location.href = `/user/reviews?bundleId=${bundleId}`;
-    } else {
-        window.location.href = "/user/reviews";
+    if (!itemId) {
+        console.error("Unable to identify item.");
+        return;
     }
+
+    window.location.href = `/user/reviews?productId=${itemId}`;
 }
 
 async function addToWishlist() {

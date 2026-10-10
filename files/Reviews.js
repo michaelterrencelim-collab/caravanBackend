@@ -53,9 +53,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     Profile
                 </a>
             `;
-        }
-
-        else {
+        } else {
             accountButton.innerHTML = `
                 <a class="nav-link" href="/login">
                     Login
@@ -69,7 +67,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (accountButton) {
             accountButton.innerHTML = `
-                /login
+                <a class="nav-link" href="/login">
                     Login
                 </a>
             `;
@@ -89,7 +87,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         const product =products[0];
 
         document.getElementById("productImage").src = product.product_image;
-
         document.getElementById(
             "productOrigin"
         ).innerHTML = `
