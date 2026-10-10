@@ -184,26 +184,73 @@
         <h3>Price Breakdown</h3>
 
         <div class="price-row">
-          <span>Products Cost:</span>
-          <span>₱999.99</span>
+            <span>Products Cost:</span>
+
+            <span id="productsCostValue">
+                ₱0.00
+            </span>
+        </div>
+
+        <div class="price-row shipping-row">
+            <span>Shipping:</span>
+
+            <select
+                id="shippingSelect"
+                class="voucher-select"
+            >
+                <option value="">
+                    Select Shipping
+                </option>
+            </select>
+        </div>
+
+        <div
+            id="shippingDescription"
+            class="shipping-description"
+        ></div>
+
+        <div class="price-row">
+            <span>Shipping Fee:</span>
+
+            <span id="shippingFeeValue">
+                ₱0.00
+            </span>
         </div>
 
         <div class="price-row">
-          <span>Shipping Fee:</span>
-          <span>₱999.99</span>
-        </div>
+            <span>Discount:</span>
 
-        <div class="price-row">
-          <span>Discount:</span>
-          <span>10% Off</span>
+            <span id="discountValue">
+                -₱0.00
+            </span>
         </div>
 
         <div class="price-row voucher-row">
-          <span>Voucher:</span>
+            <span>Voucher:</span>
 
-          <select id="voucherSelect" class="voucher-select">
-            <option value="">Select Voucher</option>
-          </select>
+            <select
+                id="voucherSelect"
+                class="voucher-select"
+            >
+                <option value="">
+                    Select Voucher
+                </option>
+            </select>
+        </div>
+
+        <span
+            id="voucherDescription"
+            class="voucher-description"
+        ></span>
+
+        <hr>
+
+        <div class="total-row">
+            <span>Total Cost:</span>
+
+            <span id="totalCostValue">
+                ₱0.00
+            </span>
         </div>
 
         <span id="voucherDescription" class="voucher-description"></span>

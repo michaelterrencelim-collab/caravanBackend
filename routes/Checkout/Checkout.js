@@ -21,6 +21,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
             items,
             addressId,
             methodId,
+            shippingId,
             voucherId
         } = req.body;
 
@@ -49,6 +50,13 @@ router.post("/", checkAuth("user"), async (req, res) => {
             return res.status(400).json({
                 success: false,
                 error: "Payment method is required"
+            });
+        }
+
+        if (!shippingId) {
+            return res.status(400).json({
+                success: false,
+                error: "Shipping option is required"
             });
         }
 
@@ -205,9 +213,32 @@ router.post("/", checkAuth("user"), async (req, res) => {
             discount = productCost * (discountPercentage / 100);
         }
 
-        const shippingFee = 100;
+        const shippingResult =
+            await transaction.execute({
+                sql: `
+                    SELECT
+                        Shipping_id,
+                        Shipping_name,
+                        Cost
+                    FROM Shipping_options
+                    WHERE Shipping_id = ?
+                    AND Status_id = 1
+                `,
+                args: [
+                    Number(shippingId)
+                ]
+            });
+
+        if (shippingResult.rows.length === 0) {
+            throw new Error(
+                "Invalid shipping option selected"
+            );
+        }
+
+        const validatedShippingId = Number(shippingResult.rows[0].Shipping_id);
+        const shippingFee = Number(shippingResult.rows[0].Cost);
         const totalCost = productCost + shippingFee - discount;
-        
+
         // TEST_MODE LOGIC 
         if (TEST_MODE) {
             const preview = {
@@ -259,11 +290,12 @@ router.post("/", checkAuth("user"), async (req, res) => {
                         Order_date,
                         Method_id,
                         Voucher_id,
-                        Discount
+                        Discount,
+                        Shipping_id
                     )
                     VALUES (
                         ?, 1, ?, ?, ?,
-                        CURRENT_TIMESTAMP, ?, ?, ?
+                        CURRENT_TIMESTAMP, ?, ?, ?, ?
                     )
                 `,
                 args: [
@@ -273,7 +305,8 @@ router.post("/", checkAuth("user"), async (req, res) => {
                     Number(addressId),
                     Number(methodId),
                     validatedVoucherId,
-                    Number(discount.toFixed(2))
+                    Number(discount.toFixed(2)), 
+                    validatedShippingId
                 ]
             });
 
@@ -361,12 +394,12 @@ router.post("/", checkAuth("user"), async (req, res) => {
             success: true,
             message: "Order placed successfully",
             orderId,
+            shippingId: validatedShippingId,
+            shippingFee: Number(shippingFee.toFixed(2)),
             productCost: Number(productCost.toFixed(2)),
             discount: Number(discount.toFixed(2)),
-            shippingFee,
             totalCost: Number(totalCost.toFixed(2))
         });
-
     } catch (error) {
         if (transaction) {
             try {

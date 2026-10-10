@@ -7,6 +7,8 @@ let addresses = [];
 let selectedAddress = null;
 
 let vouchers = [];
+let shippingOptions = [];
+let selectedShipping = null;
 let selectedVoucher = null;
 
 function showLoader() {
@@ -26,7 +28,8 @@ document.addEventListener("DOMContentLoaded", () => {
     Promise.all([
         loadCartItems(),
         loadAddresses(),
-        loadVouchers()
+        loadVouchers(), 
+        loadShippingOptions()
     ]) .finally (() => {
         hideLoader();
     });
@@ -56,15 +59,38 @@ document.addEventListener("DOMContentLoaded", () => {
         updatePriceSummary();
     });
 
+    // Shopping Options dropdown
+    document.addEventListener("change", function(event) {
+        if (event.target.id !== "shippingSelect") {
+            return;
+        }
+
+        const shippingId = Number(event.target.value);
+
+        selectedShipping =
+            shippingOptions.find(
+                shipping =>
+                    Number(shipping.Shipping_id) === shippingId
+            ) || null;
+
+        const shippingDescription = document.getElementById("shippingDescription");
+
+        if (shippingDescription) {
+            shippingDescription.textContent =
+                selectedShipping
+                    ? selectedShipping.Shipping_text || ""
+                    : "";
+        }
+
+        updatePriceSummary();
+    });
+
     // Address dropdown
     document.addEventListener(
         "change",
         function(event) {
 
-            if (
-                event.target.id !==
-                "addressSelect"
-            ) {
+            if (event.target.id !== "addressSelect") {
                 return;
             }
 
@@ -185,6 +211,11 @@ const checkout_button = document.querySelector(".checkout-btn");
 
 function checkoutWarn() {
 
+    if (!selectedShipping) {
+        alert("Please select a shipping option.");
+        return;
+    }
+
     if (!selectedPaymentMethod) {
         alert("Please select a payment method first.");
         return;
@@ -294,6 +325,7 @@ async function checkout_Yes() {
 
             addressId: Number(selectedAddress.Address_id),
             methodId: selectedPaymentMethod.methodId,
+            shippingId: Number(selectedShipping.Shipping_id),
             voucherId: selectedVoucher
                     ? Number(selectedVoucher.Voucher_id)
                     : null,
@@ -433,6 +465,24 @@ async function loadVouchers() {
             "Voucher load error:",
             error
         );
+    }
+}
+
+async function loadShippingOptions() {
+    try {
+        const response = await fetch("/shipping");
+
+        if (!response.ok) {
+            throw new Error(
+                "Unable to load shipping options"
+            );
+        }
+
+        shippingOptions = await response.json();
+        renderShippingDropdown();
+
+    } catch(error) {
+        console.error("Shipping load error: ", error);
     }
 }
 
@@ -787,9 +837,32 @@ function renderVoucherDropdown() {
     });
 }
 
+function renderShippingDropdown() {
+    const select = document.getElementById("shippingSelect");
+    if (!select) {
+        return;
+    }
+
+    select.innerHTML = `
+        <option value="">
+            Select Shipping
+        </option>
+    `;
+
+    shippingOptions.forEach(shipping => {
+        const option = document.createElement("option");
+        option.value = shipping.Shipping_id;
+
+        option.textContent =
+            `${shipping.Shipping_name} - ₱${Number(
+                shipping.Cost
+            ).toFixed(2)}`;
+        select.appendChild(option);
+    });
+}
+
 // address dropdown
 function renderAddressDropdown() {
-
     const select = document.getElementById("addressSelect");
     if (!select) return;
     select.innerHTML = "";
@@ -865,7 +938,9 @@ function updatePriceSummary() {
     });
 
     // Update price breakdown
-    const shippingFee = 100.00;
+    const shippingFee = selectedShipping
+        ? Number(selectedShipping.Cost)
+        : 0;
     let discount = 0;
 
     if (selectedVoucher) {
@@ -881,20 +956,17 @@ function updatePriceSummary() {
         discount
     );
 
-    // Update the price breakdown display
-    const priceBreakdown = document.querySelector(".price-breakdown");
-    if (priceBreakdown) {
-        const priceRows = priceBreakdown.querySelectorAll(".price-row");
-        if (priceRows.length >= 3) {
-            priceRows[0].innerHTML = `<span>Products Cost:</span><span>₱${totalProductCost.toFixed(2)}</span>`;
-            priceRows[1].innerHTML = `<span>Shipping Fee:</span><span>₱${shippingFee.toFixed(2)}</span>`;
-            priceRows[2].innerHTML = `<span>Discount:</span><span>-₱${discount.toFixed(2)}</span>`;
-        }
+    const productsCostValue = document.getElementById("productsCostValue");
+    const shippingFeeValue = document.getElementById("shippingFeeValue");
+    const discountValue = document.getElementById("discountValue");
+    const totalCostValue = document.getElementById("totalCostValue");
 
-        const totalRow = priceBreakdown.querySelector(".total-row");
-        if (totalRow) {
-            totalRow.innerHTML = `<span>Total Cost:</span><span>₱${totalCost.toFixed(2)}</span>`;
-        }
+    if (productsCostValue) {
+        productsCostValue.textContent = `₱${totalProductCost.toFixed(2)}`;
+    }
+
+    if (shippingFeeValue) {
+        shippingFeeValue.textContent = `₱${shippingFee.toFixed(2)}`;
     }
 }
 
@@ -906,7 +978,5 @@ document.addEventListener("click", function(event) {
         if (event.target.id === "viewOrdersBtn") {
             window.location.href = "/user/order";
         }
-    }
-);
-
+});
 
