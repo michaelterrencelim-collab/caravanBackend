@@ -225,29 +225,21 @@ async function checkout_Yes() {
 
     try {
         if (cartData.length === 0) {
-            throw new Error(
-                "Your cart is empty"
-            );
+            throw new Error("Your cart is empty");
         }
 
         if (!selectedAddress) {
-            throw new Error(
-                "Please select a delivery address"
-            );
+            throw new Error("Please select a delivery address");
         }
 
         if (!selectedPaymentMethod) {
-            throw new Error(
-                "Please select a payment method"
-            );
+            throw new Error("Please select a payment method");
         }
 
         if (
             selectedPaymentMethod.paymentType === "card"
         ) {
-            throw new Error(
-                "Card payment is not available yet"
-            );
+            throw new Error("Card payment is not available yet");
         }
 
         const items = cartData.map(cartItem => {
@@ -262,16 +254,50 @@ async function checkout_Yes() {
             };
         });
 
+        let discount = 0;
+
+        if (selectedVoucher) {
+            const discountPercentage = Number(selectedVoucher.discount) || 0;
+            let totalProductCost = 0;
+            cartData.forEach(cartItem => {
+                const quantity = Number(cartItem.quantity) || 1;
+                const sizeMultiplier =
+                    cartItem.cartprod_size === "16oz"
+                        ? 16
+                        : 8;
+
+                if (cartItem.isBundle) {
+                    const bundle = bundlesData.find(
+                        b => Number(b.product_id) === Number(cartItem.cartbundle_id)
+                    );
+
+                    if (bundle) {
+                        totalProductCost += Number(bundle.product_price) * sizeMultiplier * quantity;
+                    }
+                } else {
+                    const product = productsData.find(
+                        p => Number(p.product_id) === Number(cartItem.cartprod_id)
+                    );
+
+                    if (product) {
+                        totalProductCost += Number(product.product_price) * sizeMultiplier * quantity;
+                    }
+                }
+            });
+
+            discount = totalProductCost * (discountPercentage / 100);
+            discount = Math.min(discount, totalProductCost);
+        }
+
         const payload = {
             items,
 
             addressId: Number(selectedAddress.Address_id),
             methodId: selectedPaymentMethod.methodId,
             voucherId: selectedVoucher
-                    ? Number(
-                        selectedVoucher.Voucher_id
-                    )
-                    : null
+                    ? Number(selectedVoucher.Voucher_id)
+                    : null,
+            discount: Number(discount.toFixed(2))
         };
 
         const response = await fetch("/checkout", {
@@ -282,8 +308,7 @@ async function checkout_Yes() {
                     "application/json"
             },
 
-            body:
-                JSON.stringify(payload)
+            body:JSON.stringify(payload)
         });
 
         const result = await response.json();
@@ -353,13 +378,8 @@ async function checkout_Yes() {
         successState.style.display = "block";
 
     } catch (error) {
-        console.error(
-            "Checkout failed:",
-            error
-        );
-
+        console.error("Checkout failed:",error);
         modal.style.display = "none";
-
         alert(error.message || "Failed to process order.");
     } finally {
         checkoutInProgress = false;
@@ -368,20 +388,11 @@ async function checkout_Yes() {
 
 // Load cart items from localStorage and products_list.json
 async function loadCartItems() {
-
     showLoader();
-
     try {
-
-        cartData =
-            JSON.parse(
-                localStorage.getItem("cart")
-            ) || [];
-
+        cartData = JSON.parse(localStorage.getItem("cart")) || [];
         updateCheckoutButton();
-
-        const response =
-            await fetch("/api/fetchProducts");
+        const response = await fetch("/api/fetchProducts");
 
         if (!response.ok) {
             throw new Error(
@@ -395,18 +406,8 @@ async function loadCartItems() {
                 ? items
                 : [];
 
-        productsData =
-            allItems.filter(
-                item =>
-                    Number(item.type_id) === 1
-            );
-
-        bundlesData =
-            allItems.filter(
-                item =>
-                    Number(item.type_id) === 2
-            );
-
+        productsData = allItems.filter(item => Number(item.type_id) === 1);
+        bundlesData = allItems.filter(item => Number(item.type_id) === 2);
         displayCartItems();
 
     } catch (error) {
@@ -437,12 +438,8 @@ async function loadVouchers() {
 
 // Loads User's Stored addresses from db
 async function loadAddresses() {
-
     try {
-
-        const response =
-            await fetch("/api/addresses");
-
+        const response = await fetch("/api/addresses");
         if (!response.ok) {
             console.error(
                 "Failed to load addresses"
@@ -450,18 +447,11 @@ async function loadAddresses() {
             return;
         }
 
-        addresses =
-            await response.json();
-
+        addresses =await response.json();
         renderAddressDropdown();
 
     } catch (error) {
-
-        console.error(
-            "Address load error:",
-            error
-        );
-
+        console.error("Address load error: ", error);
     }
 }
 
@@ -646,16 +636,13 @@ function createBundleCard(bundle, cartItem, index) {
             </p>
         </div>
     `;
-
     return itemCard;
 }
-``
 
 function updateCheckoutButton() {
     const checkoutButton = document.querySelector(".checkout-btn");
 
     if (!checkoutButton) return;
-
     if (cartData.length === 0) {
         checkoutButton.disabled = true;
     } else {
@@ -698,30 +685,18 @@ function increaseQuantity(index) {
             const sizeMultiplier =
                 cartItem.cartprod_size === "16oz" ? 16 : 8;
 
-            const itemPrice =
-                bundle.product_price *
-                sizeMultiplier *
-                quantity;
-
-            priceElement.textContent =
-                `Price: ₱${itemPrice.toFixed(2)}`;
+            const itemPrice = bundle.product_price * sizeMultiplier * quantity;
+            priceElement.textContent = `Price: ₱${itemPrice.toFixed(2)}`;
         }
     } else {
         const productId = Number(itemCard.dataset.productId);
-        const product = productsData.find(
-            p => p.product_id === productId
-        );
+        const product = productsData.find(p => p.product_id === productId);
         if (product) {
             const sizeMultiplier =
                 cartItem.cartprod_size === "16oz" ? 16 : 8;
 
-            const itemPrice =
-                product.product_price *
-                sizeMultiplier *
-                quantity;
-
-            priceElement.textContent =
-                `Price: ₱${itemPrice.toFixed(2)}`;
+            const itemPrice = product.product_price * sizeMultiplier * quantity;
+            priceElement.textContent = `Price: ₱${itemPrice.toFixed(2)}`;
         }
     }
     updatePriceSummary();
@@ -765,11 +740,7 @@ function decreaseQuantity(index) {
                         ? 16
                         : 8;
 
-                const itemPrice =
-                    Number(bundle.product_price) *
-                    sizeMultiplier *
-                    quantity;
-
+                const itemPrice = Number(bundle.product_price) * sizeMultiplier * quantity;
                 priceElement.textContent = `Price: ₱${itemPrice.toFixed(2)}`;
             }
         } else {
@@ -782,13 +753,8 @@ function decreaseQuantity(index) {
                 const sizeMultiplier =
                     cartItem.cartprod_size === "16oz" ? 16 : 8;
 
-                const itemPrice =
-                    product.product_price *
-                    sizeMultiplier *
-                    quantity;
-
-                priceElement.textContent =
-                    `Price: ₱${itemPrice.toFixed(2)}`;
+                const itemPrice = product.product_price * sizeMultiplier * quantity;
+                priceElement.textContent = `Price: ₱${itemPrice.toFixed(2)}`;
             }
         }
         updatePriceSummary();
@@ -797,7 +763,6 @@ function decreaseQuantity(index) {
 
 // voucher dropdown
 function renderVoucherDropdown() {
-
     const select = document.getElementById("voucherSelect");
 
     if (!select) {
@@ -811,8 +776,7 @@ function renderVoucherDropdown() {
             '<option value="">No vouchers available</option>';
         return;
     }
-    select.innerHTML =
-        '<option value="">Select Voucher</option>';
+    select.innerHTML = '<option value="">Select Voucher</option>';
 
     vouchers.forEach(voucher => {
         const option = document.createElement("option");
@@ -826,24 +790,17 @@ function renderVoucherDropdown() {
 // address dropdown
 function renderAddressDropdown() {
 
-    const select =
-        document.getElementById(
-            "addressSelect"
-        );
-
+    const select = document.getElementById("addressSelect");
     if (!select) return;
-
     select.innerHTML = "";
 
     if (addresses.length === 0) {
-
         select.innerHTML =
             `
             <option value="">
                 No saved addresses
             </option>
             `;
-
         return;
     }
 
@@ -856,11 +813,8 @@ function renderAddressDropdown() {
 
     addresses.forEach(address => {
 
-        const option =
-            document.createElement("option");
-
-        option.value =
-            address.Address_id;
+        const option = document.createElement("option");
+        option.value = address.Address_id;
 
         option.textContent =
             `${address.Street_address}, `
@@ -868,7 +822,6 @@ function renderAddressDropdown() {
             + `${address.Zip_code}`;
 
         select.appendChild(option);
-
     });
 }
 
@@ -916,17 +869,9 @@ function updatePriceSummary() {
     let discount = 0;
 
     if (selectedVoucher) {
-        const discountPercentage =
-            Number(selectedVoucher.discount) || 0;
-
-        discount =
-            totalProductCost *
-            (discountPercentage / 100);
-
-        discount = Math.min(
-            discount,
-            totalProductCost
-        );
+        const discountPercentage = Number(selectedVoucher.discount) || 0;
+        discount = totalProductCost * (discountPercentage / 100);
+        discount = Math.min(discount, totalProductCost);
     }
 
     const totalCost = Math.max(

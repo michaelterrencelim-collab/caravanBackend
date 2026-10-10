@@ -10,7 +10,6 @@ router.get("/", checkAuth("user"), async (req, res) => {
 
     try {
         const customerId = req.user.userId;
-
         const result = await db.execute({
             sql: `
             SELECT
@@ -18,6 +17,7 @@ router.get("/", checkAuth("user"), async (req, res) => {
                 o.Order_date,
                 o.Total_cost,
                 o.Shipping_fee,
+                o.Discount,
 
                 os.Order_status
 
@@ -56,6 +56,7 @@ router.get("/:orderId", checkAuth("user"), async (req, res) => {
                     o.Order_date,
                     o.Total_cost,
                     o.Shipping_fee,
+                    o.Discount,
 
                     a.Street_address,
                     a.City,
@@ -94,9 +95,7 @@ router.get("/:orderId", checkAuth("user"), async (req, res) => {
         });
 
         return res.json(result.rows);
-
     } catch (error) {
-
         console.error(error);
 
         return res.status(500).json({

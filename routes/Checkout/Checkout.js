@@ -162,9 +162,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
              * Prod_price × 8 oz or 16 oz.
              */
             const unitPrice = basePrice * productSize;
-
             productCost += unitPrice * quantity;
-
             preparedItems.push({
                 productId,
                 quantity,
@@ -235,10 +233,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
                 }))
             };
 
-            console.log(
-                "CHECKOUT PREVIEW:",
-                JSON.stringify(preview, null, 4)
-            );
+            console.log("CHECKOUT PREVIEW:", JSON.stringify(preview, null, 4));
 
             await transaction.rollback();
             transaction = null;
@@ -263,11 +258,12 @@ router.post("/", checkAuth("user"), async (req, res) => {
                         Address_id,
                         Order_date,
                         Method_id,
-                        Voucher_id
+                        Voucher_id,
+                        Discount
                     )
                     VALUES (
                         ?, 1, ?, ?, ?,
-                        CURRENT_TIMESTAMP, ?, ?
+                        CURRENT_TIMESTAMP, ?, ?, ?
                     )
                 `,
                 args: [
@@ -276,7 +272,8 @@ router.post("/", checkAuth("user"), async (req, res) => {
                     shippingFee,
                     Number(addressId),
                     Number(methodId),
-                    validatedVoucherId
+                    validatedVoucherId,
+                    Number(discount.toFixed(2))
                 ]
             });
 
@@ -379,16 +376,12 @@ router.post("/", checkAuth("user"), async (req, res) => {
             }
         }
 
-        console.error(
-            "Checkout error:",
-            error
-        );
+        console.error("Checkout error:", error);
 
         return res.status(500).json({
             success: false,
-            error:
-                error.message ||
-                "Checkout failed"
+            error: 
+                error.message || "Checkout failed"
         });
     }
 });

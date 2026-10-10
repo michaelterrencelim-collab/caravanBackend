@@ -118,15 +118,13 @@ function applySortAndFilter() {
 
         case "order-desc":
             filteredOrders.sort(
-                (a, b) =>
-                    b.Order_id - a.Order_id
+                (a, b) => b.Order_id - a.Order_id
             );
             break;
 
         case "order-asc":
             filteredOrders.sort(
-                (a, b) =>
-                    a.Order_id - b.Order_id
+                (a, b) => a.Order_id - b.Order_id
             );
             break;
     }
@@ -201,12 +199,9 @@ async function loadOrders() {
                     </div>
                 </div>
             `;
-
             return;
         }
-
         renderOrders(ordersData);
-
     } catch (error) {
 
         console.error("Error loading orders:", error);
@@ -289,7 +284,7 @@ async function openReceiptModal(orderId) {
                 </p>
                 <p>
                     Discount:
-                    ₱0.00
+                    -₱${Number(firstOrder.Discount || 0).toFixed(2)}
                 </p>
                 <p>
                     Address:
@@ -320,10 +315,7 @@ async function openReceiptModal(orderId) {
 async function submitRefundRequest(event) {
     event.preventDefault();
     console.log("Submitting refund request...");
-    const reason = document
-        .getElementById("refundReason")
-        .value
-        .trim();
+    const reason = document.getElementById("refundReason").value.trim();
 
     if (!selectedRefundOrderId) {
         alert("Order not found.");
@@ -352,10 +344,7 @@ async function submitRefundRequest(event) {
         hideLoader();
 
         if (!response.ok) {
-            alert(
-                result.error ||
-                "Unable to submit refund request."
-            );
+            alert(result.error || "Unable to submit refund request.");
             return;
         }
         alert("Refund request submitted successfully.");
