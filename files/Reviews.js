@@ -18,6 +18,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const prevBtn = controlButtons[0];
     const nextBtn = controlButtons[1];
     let currentUserReview = null;
+    let allReviews = [];
+
+    // --- Pagination & View Configuration --- //
+    let currentPage = 0;
+    const cardsPerPage = 6;
 
     showLoader();
 
@@ -26,6 +31,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await loadProductOverview();
         await loadReviewSummary();
         await loadMyReview();
+        await loadReviewSummary();
+        await loadReviews();
     } catch (error) {
         console.error("Failed to initialise review page:", error);
     } finally {
@@ -257,14 +264,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 )}
             </p>
 
-            ${
-                reviewDate
-                    ? `
-                        <p class="my-review-date">
+            ${reviewDate? `<p class="my-review-date">
                             ${reviewDate}
-                        </p>
-                    `
-                    : ""
+                          </p>`: ""
             }
         `;
 
@@ -287,28 +289,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  document.addEventListener("click", event => {
-        if (event.target.id === "editReviewBtn") {
-            console.log(
-                "Edit button clicked",
-                currentUserReview
-            );
 
-            if (!currentUserReview) {
-                return;
-            }
+  async function loadReviews() {
+      try {
+          const response = await fetch(`/api/fetchReviews?productId=${productId}`);
+          if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+          }
 
-            editReviewTitle.value = currentUserReview.review_title || "";
-            editReviewComment.value = currentUserReview.review_text || "";
-            editSelectedRating.value = currentUserReview.rating || 5;
+          const reviews = await response.json();
 
-            highlightEditStars(
-                Number(editSelectedRating.value)
-            );
-            editReviewModal.classList.add("active");
-        }
-    }
-  );
+          console.log(
+              "ALL REVIEWS:",
+              reviews
+          );
+
+          console.log(
+              "CURRENT USER REVIEW:",
+              currentUserReview
+          );
+
+          /*
+          * Remove the current user's review
+          * because it already displays separately
+          * in Your Review.
+          */
+          const otherReviews = reviews.filter(
+              review =>
+                  !currentUserReview ||
+                  Number(review.Customer_id) !==
+                  Number(currentUserReview.Customer_id)
+          );
+          renderReviewCards(otherReviews);
+      } catch (error) {
+          console.error(
+              "Failed to load reviews:",
+              error
+          );
+      }
+  }
+
+  function renderReviewCards(reviews) {
+    allReviews = reviews;
+    updatePagination();
+  }
+
+
 
   async function loadReviewSummary() {
     try {
@@ -494,10 +520,66 @@ document.addEventListener("DOMContentLoaded", async () => {
     </div>
   `;
 
+  const deleteModalHTML = `
+  <div class="modal-overlay" id="deleteConfirmationModal">
+      <div class="modal-box delete-confirmation-box">
+          <div class="modal-header">
+              <h3>Delete Review</h3>
+
+              <button
+                  type="button"
+                  class="close-modal"
+                  id="closeDeleteConfirmation"
+              >
+                  &times;
+              </button>
+          </div>
+
+          <div class="delete-confirmation-content">
+              <p>
+                  Are you sure you want to delete this review?
+              </p>
+
+              <p class="delete-warning">
+                  This action cannot be undone.
+              </p>
+          </div>
+
+          <div class="edit-review-actions">
+              <button
+                  type="button"
+                  class="delete-review-btn"
+                  id="confirmDeleteReviewBtn"
+              >
+                  Confirm Delete
+              </button>
+
+              <button
+                  type="button"
+                  class="cancel-review-btn"
+                  id="cancelDeleteConfirmation"
+              >
+                  Cancel
+              </button>
+          </div>
+      </div>
+  </div>
+  `;
+
+  document.body.insertAdjacentHTML(
+      "beforeend",
+      deleteModalHTML
+  );
+
   document.body.insertAdjacentHTML(
       "beforeend",
       editModalHTML
   );
+
+  const deleteConfirmationModal = document.getElementById("deleteConfirmationModal");
+  const confirmDeleteReviewBtn = document.getElementById("confirmDeleteReviewBtn")
+  const closeDeleteConfirmation = document.getElementById("closeDeleteConfirmation");
+  const cancelDeleteConfirmation = document.getElementById("cancelDeleteConfirmation");
 
   const editReviewModal = document.getElementById("editReviewModal");
   const editReviewForm = document.getElementById("editReviewForm");
@@ -509,15 +591,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   const editSelectedRating = document.getElementById("editSelectedRating");
   const editStars = document.querySelectorAll("#editStarSelect .star");
 
+  document.addEventListener("click", event => {
+        if (event.target.id === "editReviewBtn") {
+            console.log(
+                "Edit button clicked",
+                currentUserReview
+            );
+
+            if (!currentUserReview) {
+                return;
+            }
+
+            editReviewTitle.value = currentUserReview.review_title || "";
+            editReviewComment.value = currentUserReview.review_text || "";
+            editSelectedRating.value = currentUserReview.rating || 5;
+
+            highlightEditStars(
+                Number(editSelectedRating.value)
+            );
+            editReviewModal.classList.add("active");
+        }
+    }
+  );
+
   const reviewModal = document.getElementById("reviewModal");
   const closeModalBtn = document.getElementById("closeReviewModal");
   const reviewForm = document.getElementById("reviewForm");
   const stars = document.querySelectorAll("#starSelect .star");
   const selectedRatingInput = document.getElementById("selectedRating");
-
-  // --- Pagination & View Configuration ---
-  let currentPage = 0;
-  const cardsPerPage = 6;
 
   // Render empty state if no reviews exist initially
   checkEmptyState();
@@ -566,6 +667,102 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
       }
   );
+
+/* Open the delete confirmation modal */
+deleteReviewBtn.addEventListener("click", () => {
+    if (!currentUserReview) {
+        alert("No review is available to delete.");
+        return;
+    }
+    editReviewModal.classList.remove("active");
+    deleteConfirmationModal.classList.add("active");
+});
+
+/* Close confirmation modal */
+function closeDeleteModal() {
+    deleteConfirmationModal.classList.remove("active");
+}
+
+closeDeleteConfirmation.addEventListener(
+    "click",
+    closeDeleteModal
+);
+
+cancelDeleteConfirmation.addEventListener(
+    "click",
+    closeDeleteModal
+);
+
+deleteConfirmationModal.addEventListener("click", event => {
+    if (event.target === deleteConfirmationModal) {
+        closeDeleteModal();
+    }
+});
+
+
+confirmDeleteReviewBtn.addEventListener("click", async () => {
+    if (!currentUserReview) {
+        alert("No review is available to delete.");
+        return;
+    }
+
+    const reviewId = currentUserReview.review_id;
+    try {
+        showLoader();
+        confirmDeleteReviewBtn.disabled = true;
+        confirmDeleteReviewBtn.textContent = "Deleting...";
+
+        const response = await fetch("/api/deleteReview", {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                reviewId: reviewId,
+                productId: productId
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result.error || "Unable to delete review."
+            );
+        }
+
+        // Close both modals after successful deletion.
+        closeDeleteModal();
+        editReviewModal.classList.remove("active");
+
+        // Clear the deleted review from the current session.
+        currentUserReview = null;
+
+        // Allow the customer to submit a new review.
+        if (leaveReviewBtn) {
+            leaveReviewBtn.style.display = "inline-block";
+        }
+
+        // Refresh the review section and ratings.
+        await Promise.all([
+            loadMyReview(),
+            loadReviews(),
+            loadReviewSummary()
+        ]);
+
+        alert(result.message || "Review deleted successfully.");
+
+    } catch (error) {
+        console.error("Delete review error:", error);
+        alert(error.message || "Failed to delete review.");
+
+    } finally {
+        hideLoader();
+        confirmDeleteReviewBtn.disabled = false;
+        confirmDeleteReviewBtn.textContent = "Confirm Delete";
+    }
+});
+
 
   // --- Star Rating Input Control ---
   stars.forEach((star, index) => {
@@ -855,25 +1052,98 @@ editReviewForm.addEventListener(
 );
 
   // --- Pagination / Carousel Controller ---
+
   function updatePagination() {
-    const cards = document.querySelectorAll(".review-card");
-    if (cards.length === 0) {
-      prevBtn.style.opacity = "0.5";
-      nextBtn.style.opacity = "0.5";
-      return;
-    }
+      reviewsGrid.innerHTML = "";
 
-    const totalPages = Math.ceil(cards.length / cardsPerPage);
+      if (!allReviews.length) {
+          reviewsGrid.innerHTML = `
+              <div
+                  id="noReviewsMsg"
+                  style="
+                      grid-column: 1 / -1;
+                      text-align: center;
+                      padding: 40px;
+                      color: #888;
+                  "
+              >
+                  No reviews yet.
+                  Be the first to leave a review!
+              </div>
+          `;
 
-    cards.forEach((card, index) => {
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+
+          return;
+      }
+
       const start = currentPage * cardsPerPage;
       const end = start + cardsPerPage;
-      card.style.display = (index >= start && index < end) ? "flex" : "none";
-    });
 
-    prevBtn.style.opacity = currentPage === 0 ? "0.5" : "1";
-    nextBtn.style.opacity = currentPage >= totalPages - 1 ? "0.5" : "1";
+      const reviewsForPage = allReviews.slice(
+          start,
+          end
+      );
+
+      reviewsForPage.forEach(review => {
+          const formattedDate = review.review_date
+          ? new Date(review.review_date).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric"
+          })
+          : "";
+
+
+          const rating = Math.max(
+              0,
+              Math.min(5, Number(review.rating) || 0)
+          );
+          const stars =
+              "★".repeat(rating) +
+              "☆".repeat(5 - rating);
+
+          const reviewCard = document.createElement("article");
+          reviewCard.className = "review-card";
+          reviewCard.innerHTML = `
+              <div class="review-card-body">
+                  <p class="reviewer-name">
+                      User:
+                      ${escapeHTML(review.first_name || "")}
+                  </p>
+
+                  <div class="review-rating">
+                      Rating:
+                      <span class="stars">${stars}</span>
+                      <span class="rating-num">
+                          [${rating} stars]
+                      </span>
+                  </div>
+
+                  <h3 class="review-title">
+                      ${escapeHTML(review.review_title || "")}
+                  </h3>
+
+                  <p class="review-comment">
+                      ${escapeHTML(review.review_text || "")}
+                  </p>
+
+                  <p class="review-date">
+                      Date: ${escapeHTML(formattedDate)}
+                  </p>
+              </div>
+          `;
+          reviewsGrid.appendChild(reviewCard);
+      });
+
+      const totalPages = Math.ceil(
+          allReviews.length / cardsPerPage
+      );
+      prevBtn.disabled = currentPage === 0;
+      nextBtn.disabled = currentPage >= totalPages - 1;
   }
+
 
   prevBtn.addEventListener("click", () => {
     if (currentPage > 0) {
@@ -882,13 +1152,14 @@ editReviewForm.addEventListener(
     }
   });
 
+
   nextBtn.addEventListener("click", () => {
-    const cards = document.querySelectorAll(".review-card");
-    if ((currentPage + 1) * cardsPerPage < cards.length) {
+    if ((currentPage + 1) * cardsPerPage < allReviews.length) {
       currentPage++;
       updatePagination();
     }
   });
+
 
   // Helper: Empty state handling
   function checkEmptyState() {

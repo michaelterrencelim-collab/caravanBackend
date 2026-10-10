@@ -549,6 +549,30 @@ body {
   margin-top: 6px;
 }
 
+/* Delete Review Confirmation Modal */
+.delete-confirmation-box {
+    max-width: 450px;
+    width: 90%;
+    z-index: 9000px;
+}
+
+.delete-confirmation-content {
+    padding: 20px 0;
+    color: #444;
+    line-height: 1.6;
+}
+
+.delete-warning {
+    color: #b42318;
+    font-size: 0.9rem;
+    margin-bottom: 0;
+}
+
+#confirmDeleteReviewBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* Modal Overlay & Styling */
 .modal-overlay {
   display: none;
