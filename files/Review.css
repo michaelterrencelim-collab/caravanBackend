@@ -385,6 +385,65 @@ body {
   }
 }
 
+/* Edit Main review modal */
+.edit-review-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.save-review-btn,
+.cancel-review-btn,
+.delete-review-btn {
+  flex: 1;
+  padding: 11px 16px;
+  border-radius: 8px;
+  font-family: InstrumentSans_Semi, sans-serif;
+  cursor: pointer;
+}
+
+.save-review-btn {
+  border: none;
+  background: var(--color-green-card, #4F7658);
+  color: white;
+}
+
+.save-review-btn:hover {
+  background: #42664A;
+}
+
+.cancel-review-btn {
+  border: 1px solid #777;
+  background: white;
+  color: #444;
+}
+
+.cancel-review-btn:hover {
+  background: #F2F2F2;
+}
+
+.delete-review-btn {
+  border: none;
+  background: #B02A37;
+  color: white;
+}
+
+.delete-review-btn:hover {
+  background: #93202B;
+}
+
+.save-review-btn:disabled,
+.delete-review-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .edit-review-actions {
+    flex-direction: column;
+  }
+}
+
 /* Carousel Control Buttons */
 .carousel-controls {
   display: flex;

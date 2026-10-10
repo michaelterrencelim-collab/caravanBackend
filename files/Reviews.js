@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const controlButtons = document.querySelectorAll(".control-btn");
     const prevBtn = controlButtons[0];
     const nextBtn = controlButtons[1];
+    let currentUserReview = null;
 
     showLoader();
 
@@ -152,6 +153,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         const review = await response.json();
+        currentUserReview = review;
+
+        if (!review) {
+            currentUserReview = null;
+
+            if (leaveReviewBtn) {
+                leaveReviewBtn.style.display = "inline-block";
+            }
+            return;
+        }
 
         console.log(
             "Logged-in customer's review:",
@@ -276,6 +287,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  document.addEventListener("click", event => {
+        if (event.target.id === "editReviewBtn") {
+            console.log(
+                "Edit button clicked",
+                currentUserReview
+            );
+
+            if (!currentUserReview) {
+                return;
+            }
+
+            editReviewTitle.value = currentUserReview.review_title || "";
+            editReviewComment.value = currentUserReview.review_text || "";
+            editSelectedRating.value = currentUserReview.rating || 5;
+
+            highlightEditStars(
+                Number(editSelectedRating.value)
+            );
+            editReviewModal.classList.add("active");
+        }
+    }
+  );
+
   async function loadReviewSummary() {
     try {
         const response = await fetch(`/api/reviewSummary?productId=${productId}`);
@@ -361,6 +395,119 @@ document.addEventListener("DOMContentLoaded", async () => {
     </div>
   `;
   document.body.insertAdjacentHTML("beforeend", modalHTML);
+  
+  const editModalHTML = `
+    <div
+        class="modal-overlay"
+        id="editReviewModal"
+    >
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Edit Review</h3>
+
+                <button
+                    type="button"
+                    class="close-modal"
+                    id="closeEditReviewModal"
+                >
+                    &times;
+                </button>
+            </div>
+
+            <form id="editReviewForm">
+                <div class="form-field-group">
+                    <label>Rating</label>
+
+                    <div
+                        class="star-rating-select"
+                        id="editStarSelect"
+                    >
+                        <span class="star" data-value="1">★</span>
+                        <span class="star" data-value="2">★</span>
+                        <span class="star" data-value="3">★</span>
+                        <span class="star" data-value="4">★</span>
+                        <span class="star" data-value="5">★</span>
+                    </div>
+
+                    <input
+                        type="hidden"
+                        id="editSelectedRating"
+                        value="5"
+                    >
+                </div>
+
+                <div class="form-field-group">
+                    <label for="editReviewTitle">
+                        Review Title
+                    </label>
+
+                    <input
+                        type="text"
+                        id="editReviewTitle"
+                        class="radius-10-input"
+                        maxlength="150"
+                        required
+                    >
+                </div>
+
+                <div class="form-field-group">
+                    <label for="editReviewComment">
+                        Review Text
+                    </label>
+
+                    <textarea
+                        id="editReviewComment"
+                        class="custom-input-box"
+                        rows="5"
+                        maxlength="2000"
+                        required
+                    ></textarea>
+                </div>
+
+                <div class="edit-review-actions">
+                    <button
+                        type="submit"
+                        class="save-review-btn"
+                        id="saveEditedReviewBtn"
+                    >
+                        Save
+                    </button>
+
+                    <button
+                        type="button"
+                        class="cancel-review-btn"
+                        id="cancelEditReviewBtn"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="button"
+                        class="delete-review-btn"
+                        id="deleteReviewBtn"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML(
+      "beforeend",
+      editModalHTML
+  );
+
+  const editReviewModal = document.getElementById("editReviewModal");
+  const editReviewForm = document.getElementById("editReviewForm");
+  const closeEditReviewModalBtn = document.getElementById("closeEditReviewModal");
+  const cancelEditReviewBtn = document.getElementById("cancelEditReviewBtn");
+  const deleteReviewBtn = document.getElementById("deleteReviewBtn");
+  const editReviewTitle = document.getElementById("editReviewTitle");
+  const editReviewComment = document.getElementById("editReviewComment");
+  const editSelectedRating = document.getElementById("editSelectedRating");
+  const editStars = document.querySelectorAll("#editStarSelect .star");
 
   const reviewModal = document.getElementById("reviewModal");
   const closeModalBtn = document.getElementById("closeReviewModal");
@@ -390,6 +537,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  closeEditReviewModalBtn.addEventListener(
+      "click",
+      () => {
+          editReviewModal.classList.remove(
+              "active"
+          );
+      }
+  );
+
+  cancelEditReviewBtn.addEventListener(
+      "click",
+      () => {
+          editReviewModal.classList.remove(
+              "active"
+          );
+      }
+  );
+
+  editReviewModal.addEventListener(
+      "click",
+      event => {
+
+          if (event.target === editReviewModal) {
+              editReviewModal.classList.remove(
+                  "active"
+              );
+          }
+      }
+  );
+
   // --- Star Rating Input Control ---
   stars.forEach((star, index) => {
     star.addEventListener("mouseover", () => highlightStars(index + 1));
@@ -407,6 +584,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   highlightStars(5);
 
+  function highlightEditStars(count) {
+    editStars.forEach((star, idx) => {
+
+        star.style.color =
+            idx < count
+                ? "#E2B02B"
+                : "#CCC";
+    });
+  }
+
+  editStars.forEach((star, index) => {
+    star.addEventListener(
+        "click",
+        () => {
+            editSelectedRating.value = index + 1;
+            highlightEditStars(index + 1);
+        }
+    );
+  });
+
 // --- Submit Review Handler ---
 reviewForm.addEventListener("submit", async event => {
     event.preventDefault();
@@ -423,8 +620,7 @@ reviewForm.addEventListener("submit", async event => {
             .value
             .trim();
 
-    const rating =
-        Number(selectedRatingInput.value);
+    const rating = Number(selectedRatingInput.value);
 
     if (!productId) {
         alert("Unable to identify this product or bundle.");
@@ -450,9 +646,7 @@ reviewForm.addEventListener("submit", async event => {
         return;
     }
 
-    const submitButton =
-        reviewForm.querySelector(".submit-btn");
-
+    const submitButton = reviewForm.querySelector(".submit-btn");
     try {
         showLoader();
 
@@ -589,6 +783,76 @@ reviewForm.addEventListener("submit", async event => {
         }
     }
 });
+
+editReviewForm.addEventListener(
+    "submit",
+    async event => {
+
+        event.preventDefault();
+
+        if (!currentUserReview) {
+            return;
+        }
+
+        try {
+            showLoader();
+            const response =
+                await fetch(
+                    "/api/updateReview",
+                    {
+                        method: "PUT",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            reviewId: currentUserReview.review_id,
+                            rating: Number(editSelectedRating.value),
+                            review_title: editReviewTitle.value.trim(),
+                            review_text: editReviewComment.value.trim()
+                        })
+                    }
+                );
+
+            const result = await response.json();
+            if (!response.ok) {
+
+                throw new Error(
+                    result.error ||
+                    "Unable to update review."
+                );
+
+            }
+
+            editReviewModal.classList.remove(
+                "active"
+            );
+
+            await Promise.all([
+                loadMyReview(),
+                loadReviewSummary()
+            ]);
+
+            alert(
+                result.message ||
+                "Review updated successfully."
+            );
+        }
+
+        catch(error) {
+            console.error(
+                "Update review error:",
+                error
+            );
+            alert(error.message);
+        
+        }finally {
+          hideLoader();
+        }
+    }
+);
 
   // --- Pagination / Carousel Controller ---
   function updatePagination() {
