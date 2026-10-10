@@ -130,7 +130,7 @@ app.get("/reviewSummary", async (req, res) => {
  *
  * GET /api/myReview?productId=1
  */
-app.get("/myReview", async (req, res) => {
+app.get("/myReview", checkAuth("user"), async (req, res) => {
         try {
             const customerId = Number(req.user.userId);
             const productId = Number(req.query.productId);

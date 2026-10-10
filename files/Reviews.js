@@ -11,24 +11,27 @@ function hideLoader() {
 
 document.addEventListener("DOMContentLoaded", async () => {
 
+    // Initialise DOM references before calling functions that use them.
+    const leaveReviewBtn = document.getElementById("leaveReviewBtn");
+    const reviewsGrid = document.getElementById("reviewsGrid");
+    const controlButtons = document.querySelectorAll(".control-btn");
+    const prevBtn = controlButtons[0];
+    const nextBtn = controlButtons[1];
+
     showLoader();
-    await updateNavbarLogin();
 
     try {
+        await updateNavbarLogin();
         await loadProductOverview();
         await loadReviewSummary();
+        await loadMyReview();
+    } catch (error) {
+        console.error("Failed to initialise review page:", error);
     } finally {
         hideLoader();
     }
 
-  // --- DOM Elements ---
-  const leaveReviewBtn = document.querySelector(".leave-review-btn");
-  const reviewsGrid = document.getElementById("reviewsGrid");
-  const prevBtn = document.querySelectorAll(".control-btn")[0];
-  const nextBtn = document.querySelectorAll(".control-btn")[1];
-
   async function updateNavbarLogin() {
-
     try {
         const response = await fetch("/api/isLoggedIn");
         const accountButton = document.getElementById("accountButton");
@@ -73,7 +76,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             `;
         }
     }
-}
+  }
 
   async function loadProductOverview() {
     try {
@@ -100,6 +103,176 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.getElementById("productDescription").textContent = product.product_desc;
     } catch(error) {
         console.error("Failed to load product:", error);
+    }
+  }
+
+  async function loadMyReview() {
+    const myReviewSection =
+        document.getElementById(
+            "myReviewSection"
+        );
+
+    if (!myReviewSection) {
+        console.error(
+            "myReviewSection is missing from Review.html"
+        );
+
+        return;
+    }
+
+    /*
+     * Keep the section hidden unless a review
+     * is successfully retrieved.
+     */
+    myReviewSection.style.display = "none";
+    myReviewSection.innerHTML = "";
+
+    try {
+        const response = await fetch(`/api/myReview?productId=${encodeURIComponent(productId)}`);
+
+        const contentType =
+            response.headers.get(
+                "content-type"
+            ) || "";
+
+        if (
+            !contentType.includes(
+                "application/json"
+            )
+        ) {
+            const responseText =
+                await response.text();
+
+            console.error(
+                "Non-JSON myReview response:",
+                responseText
+            );
+
+            return;
+        }
+
+        const review = await response.json();
+
+        console.log(
+            "Logged-in customer's review:",
+            review
+        );
+
+        if (!response.ok) {
+            console.error(
+                review.error ||
+                "Unable to retrieve customer review"
+            );
+            return;
+        }
+
+        /*
+         * The API returns null when the customer
+         * has not reviewed this product.
+         */
+        if (!review) {
+            if (leaveReviewBtn) {
+                leaveReviewBtn.style.display =
+                    "inline-block";
+            }
+            return;
+        }
+
+        const rating =
+            Math.max(
+                1,
+                Math.min(
+                    5,
+                    Number(review.rating) || 1
+                )
+            );
+
+        const reviewStars =
+            "★".repeat(rating) +
+            "☆".repeat(5 - rating);
+
+        const reviewDate =
+            review.review_date
+                ? new Date(
+                    review.review_date
+                ).toLocaleDateString(
+                    "en-GB",
+                    {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric"
+                    }
+                )
+                : "";
+
+        myReviewSection.innerHTML = `
+            <div class="my-review-header">
+                <div>
+                    <h3>Your Review</h3>
+
+                    <div class="my-review-rating">
+                        <span class="my-review-stars">
+                            ${reviewStars}
+                        </span>
+
+                        <strong>
+                            ${rating} ${
+                                rating === 1
+                                    ? "Star"
+                                    : "Stars"
+                            }
+                        </strong>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    class="edit-review-btn"
+                    id="editReviewBtn"
+                >
+                    Edit Review
+                </button>
+            </div>
+
+            <h4 class="my-review-title">
+                ${escapeHTML(
+                    review.review_title || ""
+                )}
+            </h4>
+
+            <p class="my-review-comment">
+                ${escapeHTML(
+                    review.review_text || ""
+                )}
+            </p>
+
+            ${
+                reviewDate
+                    ? `
+                        <p class="my-review-date">
+                            ${reviewDate}
+                        </p>
+                    `
+                    : ""
+            }
+        `;
+
+        myReviewSection.style.display = "block";
+
+        /*
+         * A customer can only submit one review
+         * per product, so hide this button.
+         */
+        if (leaveReviewBtn) {
+            leaveReviewBtn.style.display =
+                "none";
+        }
+
+    } catch (error) {
+        console.error(
+            "Failed to load customer review:",
+            error
+        );
     }
   }
 
@@ -234,58 +407,188 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   highlightStars(5);
 
-  // --- Submit Review Handler ---
-  reviewForm.addEventListener("submit", (e) => {
-    e.preventDefault();
+// --- Submit Review Handler ---
+reviewForm.addEventListener("submit", async event => {
+    event.preventDefault();
 
-    const name = document.getElementById("reviewerName").value.trim();
-    const title = document.getElementById("reviewTitle").value.trim();
-    const comment = document.getElementById("reviewComment").value.trim();
-    const ratingVal = parseInt(selectedRatingInput.value, 10);
+    const title =
+        document
+            .getElementById("reviewTitle")
+            .value
+            .trim();
 
-    // Format current date
-    const today = new Date();
-    const dateFormatted = today.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric"
-    });
+    const comment =
+        document
+            .getElementById("reviewComment")
+            .value
+            .trim();
 
-    const starString = "★".repeat(ratingVal) + "☆".repeat(5 - ratingVal);
+    const rating =
+        Number(selectedRatingInput.value);
 
-    // Remove empty state message if present
-    const emptyMsg = document.getElementById("noReviewsMsg");
-    if (emptyMsg) emptyMsg.remove();
+    if (!productId) {
+        alert("Unable to identify this product or bundle.");
+        return;
+    }
 
-    // Build review card element
-    const newCard = document.createElement("article");
-    newCard.className = "review-card";
-    newCard.innerHTML = `
-      <img src="./Images/paprika.jpg" alt="Paprika" class="review-card-img" />
-      <div class="review-card-body">
-        <p class="reviewer-name">User: ${escapeHTML(name)}</p>
-        <div class="review-rating">
-          Rating: <span class="stars">${starString}</span> <span class="rating-num">[${ratingVal} stars]</span>
-        </div>
-        <h3 class="review-title">Title: ${escapeHTML(title)}</h3>
-        <p class="review-comment">Comment: ${escapeHTML(comment)}</p>
-        <p class="review-date">Date: ${dateFormatted}</p>
-      </div>
-    `;
+    if (
+        !Number.isInteger(rating) ||
+        rating < 1 ||
+        rating > 5
+    ) {
+        alert("Please select a rating from 1 to 5 stars.");
+        return;
+    }
 
-    // Prepend new review card to top of grid
-    reviewsGrid.prepend(newCard);
+    if (!title) {
+        alert("Please enter a review title.");
+        return;
+    }
 
-    // Reset pagination to first page & update view
-    currentPage = 0;
-    updatePagination();
+    if (!comment) {
+        alert("Please enter your review comment.");
+        return;
+    }
 
-    // Reset form and close modal
-    reviewForm.reset();
-    selectedRatingInput.value = "5";
-    highlightStars(5);
-    reviewModal.classList.remove("active");
-  });
+    const submitButton =
+        reviewForm.querySelector(".submit-btn");
+
+    try {
+        showLoader();
+
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent =
+                "Submitting...";
+        }
+
+        const response =
+            await fetch("/api/addReview", {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+                    productId: productId,
+                    rating: rating,
+                    review_title: title,
+                    review_text: comment
+                })
+            });
+
+        const contentType =
+            response.headers.get(
+                "content-type"
+            ) || "";
+
+        /*
+         * Authentication middleware may redirect
+         * unauthorised users to an HTML login page.
+         */
+        if (
+            !contentType.includes(
+                "application/json"
+            )
+        ) {
+            const responseText =
+                await response.text();
+
+            console.error(
+                "Non-JSON add-review response:",
+                responseText
+            );
+
+            if (
+                response.status === 401 ||
+                response.redirected
+            ) {
+                alert(
+                    "Please log in before leaving a review."
+                );
+
+                window.location.href =
+                    `/login?redirect=${encodeURIComponent(
+                        window.location.href
+                    )}`;
+
+                return;
+            }
+
+            throw new Error(
+                "The server returned an invalid response."
+            );
+        }
+
+        const result =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result.error ||
+                "Unable to submit review."
+            );
+        }
+
+        console.log(
+            "Review successfully saved:",
+            result
+        );
+
+        reviewForm.reset();
+
+        selectedRatingInput.value = "5";
+
+        highlightStars(5);
+
+        reviewModal.classList.remove(
+            "active"
+        );
+
+        /*
+         * Refresh the summary so the average rating
+         * and review count include the new review.
+         */
+        await Promise.all([
+            loadReviewSummary(),
+            loadMyReview()
+        ]);
+
+        alert(result.message || "Review added successfully.");
+
+        /*
+         * Hide Leave a Review after a successful
+         * submission because one customer can only
+         * review each product once.
+         */
+        if (leaveReviewBtn) {
+            leaveReviewBtn.style.display =
+                "none";
+        }
+
+    } catch (error) {
+        console.error(
+            "Failed to submit review:",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Failed to submit review."
+        );
+
+    } finally {
+        hideLoader();
+
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent =
+                "Submit Review";
+        }
+    }
+});
 
   // --- Pagination / Carousel Controller ---
   function updatePagination() {
