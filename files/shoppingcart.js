@@ -119,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const paymentType =
                 option.dataset.paymentType;
 
-            if (paymentType === "card") {
+            if (String(paymentType).toLowerCase() === "card") {
                 alert("Card payment is not available yet.");
                 return;
             }
@@ -246,10 +246,16 @@ async function checkout_Yes() {
     const modal = document.querySelector(".checkout-result-modal");
     const processingState = document.getElementById("checkoutProcessingState");
     const successState = document.getElementById("checkoutSuccessState");
+    const processingSpinner = processingState.querySelector(".spinner");
+    const processingMessage = processingState.querySelector("p");
+    const paypalButtonContainer = document.getElementById("paypalButtonContainer");
 
     modal.style.display = "flex";
     processingState.style.display = "block";
     successState.style.display = "none";
+    processingSpinner.style.display = "block";
+    processingMessage.textContent = "Please wait while we place your order.";
+    paypalButtonContainer.innerHTML = "";
 
     checkoutInProgress = true;
 
@@ -266,9 +272,7 @@ async function checkout_Yes() {
             throw new Error("Please select a payment method");
         }
 
-        if (
-            selectedPaymentMethod.paymentType === "card"
-        ) {
+        if (String(selectedPaymentMethod.paymentType).toLowerCase() === "card") {
             throw new Error("Card payment is not available yet");
         }
 
@@ -324,12 +328,79 @@ async function checkout_Yes() {
 
             addressId: Number(selectedAddress.Address_id),
             methodId: selectedPaymentMethod.methodId,
+            paymentType: String(selectedPaymentMethod.paymentType).toLowerCase(),
             shippingId: Number(selectedShipping.Shipping_id),
             voucherId: selectedVoucher
                     ? Number(selectedVoucher.Voucher_id)
                     : null,
             discount: Number(discount.toFixed(2))
         };
+
+        if (payload.paymentType === "paypal") {
+            processingSpinner.style.display = "none";
+            processingMessage.textContent = "Approve your payment securely with PayPal.";
+            await loadPayPalSdk();
+
+            await window.paypal.Buttons({
+                createOrder: async () => {
+                    const displayedTotal = document.getElementById("totalCostValue")?.textContent || "";
+                    const totalCost = Number(displayedTotal.replace(/[^0-9.]/g, ""));
+                    const response = await fetch("/paypal/create-order", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ totalCost })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || "Unable to start PayPal payment");
+                    return result.id;
+                },
+                onApprove: async (data) => {
+                    try {
+                        const response = await fetch("/checkout", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ ...payload, paypalOrderId: data.orderID })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error || "Unable to complete PayPal checkout");
+
+                        localStorage.removeItem("cart");
+                        cartData = [];
+                        selectedVoucher = null;
+                        selectedShipping = null;
+                        selectedAddress = null;
+                        selectedPaymentMethod = null;
+                        displayCartItems();
+                        updateCheckoutButton();
+                        updatePriceSummary();
+                        document.querySelectorAll(".payment-option").forEach(option => option.classList.remove("selected"));
+                        ["voucherSelect", "shippingSelect", "addressSelect"].forEach(id => {
+                            const select = document.getElementById(id);
+                            if (select) select.value = "";
+                        });
+                        ["voucherDescription", "shippingDescription"].forEach(id => {
+                            const description = document.getElementById(id);
+                            if (description) description.textContent = "";
+                        });
+                        processingState.style.display = "none";
+                        successState.style.display = "block";
+                    } catch (error) {
+                        console.error("PayPal checkout failed:", error);
+                        modal.style.display = "none";
+                        alert(error.message || "PayPal payment could not be completed.");
+                    }
+                },
+                onCancel: () => {
+                    modal.style.display = "none";
+                },
+                onError: (error) => {
+                    console.error("PayPal approval failed:", error);
+                    modal.style.display = "none";
+                    alert("PayPal could not process the payment. Please try again.");
+                }
+            }).render("#paypalButtonContainer");
+            return;
+        }
 
         const response = await fetch("/checkout", {
             method: "POST",
@@ -426,6 +497,24 @@ async function checkout_Yes() {
     } finally {
         checkoutInProgress = false;
     }
+}
+
+async function loadPayPalSdk() {
+    if (window.paypal) return;
+
+    const configResponse = await fetch("/paypal/config");
+    const config = await configResponse.json();
+    if (!configResponse.ok || !config.clientId) {
+        throw new Error(config.error || "PayPal is not configured");
+    }
+
+    await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.clientId)}&currency=PHP&intent=capture`;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("Unable to load PayPal checkout"));
+        document.head.appendChild(script);
+    });
 }
 
 // Load cart items from localStorage and products_list.json

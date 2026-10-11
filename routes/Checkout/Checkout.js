@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require("../../imports/database");
 const { checkAuth } = require("../../imports/token");
 const { sendOrderConfirmation } = require("../../imports/email");
+const { captureOrder } = require("../paypal/paypal");
 
 router.customPath = "/checkout";
 
@@ -22,6 +23,8 @@ router.post("/", checkAuth("user"), async (req, res) => {
             items,
             addressId,
             methodId,
+            paymentType,
+            paypalOrderId,
             shippingId,
             voucherId
         } = req.body;
@@ -68,13 +71,6 @@ router.post("/", checkAuth("user"), async (req, res) => {
             });
         }
 
-        if (!methodId) {
-            return res.status(400).json({
-                success: false,
-                error: "Payment method is required"
-            });
-        }
-
         if (!shippingId) {
             return res.status(400).json({
                 success: false,
@@ -82,21 +78,35 @@ router.post("/", checkAuth("user"), async (req, res) => {
             });
         }
 
-        /*
-         * Method_id:
-         * 1 = Card
-         * 2 = Cash
-         *
-         * Card is not implemented yet.
-         */
-        if (Number(methodId) === 1) {
+        const normalizedPaymentType = String(paymentType || "cash").toLowerCase();
+        let resolvedMethodId;
+        if (normalizedPaymentType === "paypal") {
+            const paypalMethod = await db.execute({
+                sql: `
+                    SELECT Method_id
+                    FROM Payment_method
+                    WHERE LOWER(Payment_method) = 'paypal'
+                    LIMIT 1
+                `
+            });
+            if (paypalMethod.rows.length === 0) {
+                return res.status(409).json({
+                    success: false,
+                    error: "PayPal is not configured as a payment method. Add PayPal to the Payment_method table."
+                });
+            }
+            resolvedMethodId = Number(paypalMethod.rows[0].Method_id);
+            if (!paypalOrderId) {
+                return res.status(400).json({ success: false, error: "PayPal approval is required" });
+            }
+        } else if (normalizedPaymentType === "cash" && Number(methodId) === 2) {
+            resolvedMethodId = 2;
+        } else if (normalizedPaymentType === "card" || Number(methodId) === 1) {
             return res.status(501).json({
                 success: false,
                 error: "Card payment is not available yet"
             });
-        }
-
-        if (Number(methodId) !== 2) {
+        } else {
             return res.status(400).json({
                 success: false,
                 error: "Invalid payment method"
@@ -268,7 +278,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
             const preview = {
                 customerId,
                 addressId: Number(addressId),
-                methodId: Number(methodId),
+                methodId: resolvedMethodId,
                 voucherId: validatedVoucherId,
 
                 pricing: {
@@ -301,6 +311,21 @@ router.post("/", checkAuth("user"), async (req, res) => {
             });
         }
 
+        // PayPal is captured only after server-side cart, stock, address,
+        // voucher, and shipping validation has produced the final amount.
+        if (normalizedPaymentType === "paypal") {
+            try {
+                await captureOrder(
+                    paypalOrderId,
+                    customerId,
+                    Number(totalCost.toFixed(2))
+                );
+            } catch (paymentError) {
+                console.error("PayPal capture error:", paymentError.response?.data || paymentError.message);
+                throw new Error(paymentError.message || "PayPal payment could not be captured");
+            }
+        }
+
         // Create order with Confirmed status.
         const orderResult =
             await transaction.execute({
@@ -327,7 +352,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
                     Number(totalCost.toFixed(2)),
                     shippingFee,
                     Number(addressId),
-                    Number(methodId),
+                    resolvedMethodId,
                     validatedVoucherId,
                     Number(discount.toFixed(2)), 
                     validatedShippingId

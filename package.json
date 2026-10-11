@@ -22,6 +22,7 @@
   "homepage": "https://github.com/Cantis10/caravanBackend#readme",
   "dependencies": {
     "@libsql/client": "^0.17.4",
+    "@paypal/paypal-server-sdk": "^2.5.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
