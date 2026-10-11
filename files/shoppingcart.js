@@ -138,7 +138,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 });
-``
 
 // checks if user Logged in; if so, change login to profile
 async function updateNavbarLogin(){
@@ -377,6 +376,7 @@ async function checkout_Yes() {
 
         cartData = [];
         selectedVoucher = null;
+        selectedShipping = null;
         selectedAddress = null;
         selectedPaymentMethod = null;
 
@@ -391,11 +391,17 @@ async function checkout_Yes() {
             });
 
         const voucherSelect = document.getElementById("voucherSelect");
+        const shippingSelect = document.getElementById("shippingSelect");
         const addressSelect = document.getElementById("addressSelect");
         const voucherDescription = document.getElementById("voucherDescription");
+        const shippingDescription = document.getElementById("shippingDescription");
 
         if (voucherSelect) {
             voucherSelect.value = "";
+        }
+
+        if (shippingSelect) {
+            shippingSelect.value = "";
         }
 
         if (addressSelect) {
@@ -404,6 +410,10 @@ async function checkout_Yes() {
 
         if (voucherDescription) {
             voucherDescription.textContent = "";
+        }
+
+        if (shippingDescription) {
+            shippingDescription.textContent = "";
         }
 
         processingState.style.display = "none";
@@ -902,24 +912,51 @@ function renderAddressDropdown() {
 function updatePriceSummary() {
     let totalProductCost = 0;
 
-    // Calculate total based on quantities
-    document.querySelectorAll(".item-card").forEach((itemCard, index) => {
-        const cartIndex = parseInt(itemCard.dataset.cartIndex, 10);
-        const cartItem = cartData[cartIndex];
-        if (!cartItem) {
-            return;
-        }
-        const quantityElement = itemCard.querySelector(".product_quantity");
-        const quantity = quantityElement ? parseInt(quantityElement.textContent) : 1;
-        const sizeMultiplier = cartItem && cartItem.cartprod_size === "16oz" ? 16 : 8;
+    document
+        .querySelectorAll(".item-card")
+        .forEach(itemCard => {
+            const cartIndex =
+                parseInt(
+                    itemCard.dataset.cartIndex,
+                    10
+                );
+
+            const cartItem =
+                cartData[cartIndex];
+
+            if (!cartItem) {
+                return;
+            }
+
+            const quantityElement =
+                itemCard.querySelector(
+                    ".product_quantity"
+                );
+
+            const quantity =
+                quantityElement
+                    ? Number(
+                        quantityElement.textContent
+                    ) || 1
+                    : 1;
+
+            const sizeMultiplier =
+                cartItem.cartprod_size === "16oz"
+                    ? 16
+                    : 8;
 
             if (cartItem.isBundle) {
-                //handle bundle
-                const bundleId = Number(itemCard.dataset.bundleId);
+                const bundleId =
+                    Number(
+                        itemCard.dataset.bundleId
+                    );
 
-                const bundle = bundlesData.find(
-                    item => Number(item.product_id) === bundleId
-                );
+                const bundle =
+                    bundlesData.find(
+                        item =>
+                            Number(item.product_id) ===
+                            bundleId
+                    );
 
                 if (bundle) {
                     totalProductCost +=
@@ -927,34 +964,57 @@ function updatePriceSummary() {
                         sizeMultiplier *
                         quantity;
                 }
-            } else {
-            // Handle product
-            const productId = parseInt(itemCard.dataset.productId, 10);
-            const product = productsData.find(p => p.product_id === productId);
-            if (product) {
-                totalProductCost += product.product_price * sizeMultiplier * quantity;
-            }
-        }
-    });
 
-    // Update price breakdown
-    const shippingFee = selectedShipping
-        ? Number(selectedShipping.Cost)
-        : 0;
+                return;
+            }
+
+            const productId =
+                Number(
+                    itemCard.dataset.productId
+                );
+
+            const product =
+                productsData.find(
+                    item =>
+                        Number(item.product_id) ===
+                        productId
+                );
+
+            if (product) {
+                totalProductCost +=
+                    Number(product.product_price) *
+                    sizeMultiplier *
+                    quantity;
+            }
+        });
+
+    const shippingFee =
+        selectedShipping
+            ? Number(selectedShipping.Cost) || 0
+            : 0;
+
     let discount = 0;
 
     if (selectedVoucher) {
         const discountPercentage = Number(selectedVoucher.discount) || 0;
-        discount = totalProductCost * (discountPercentage / 100);
-        discount = Math.min(discount, totalProductCost);
+        discount =
+            totalProductCost *
+            (discountPercentage / 100);
+
+        discount =
+            Math.min(
+                discount,
+                totalProductCost
+            );
     }
 
-    const totalCost = Math.max(
-        0,
-        totalProductCost +
-        shippingFee -
-        discount
-    );
+    const totalCost =
+        Math.max(
+            0,
+            totalProductCost +
+            shippingFee -
+            discount
+        );
 
     const productsCostValue = document.getElementById("productsCostValue");
     const shippingFeeValue = document.getElementById("shippingFeeValue");
@@ -967,6 +1027,14 @@ function updatePriceSummary() {
 
     if (shippingFeeValue) {
         shippingFeeValue.textContent = `₱${shippingFee.toFixed(2)}`;
+    }
+
+    if (discountValue) {
+        discountValue.textContent = `-₱${discount.toFixed(2)}`;
+    }
+
+    if (totalCostValue) {
+        totalCostValue.textContent = `₱${totalCost.toFixed(2)}`;
     }
 }
 

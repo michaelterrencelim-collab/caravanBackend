@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../../imports/database");
 const { checkAuth } = require("../../imports/token");
+const { sendOrderConfirmation } = require("../../imports/email");
 
 router.customPath = "/checkout";
 
@@ -31,6 +32,27 @@ router.post("/", checkAuth("user"), async (req, res) => {
                 error: "User ID not found"
             });
         }
+
+        const customerResult = await db.execute({
+            sql: `
+                SELECT
+                    Cus_email,
+                    first_name
+                FROM Customer
+                WHERE Customer_id = ?
+            `,
+            args: [customerId]
+        });
+
+        if (customerResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: "Customer account was not found"
+            });
+        }
+
+        const customerEmail = customerResult.rows[0].Cus_email;
+        const customerName = customerResult.rows[0].first_name;
 
         if (!Array.isArray(items) || items.length === 0) {
             return res.status(400).json({
@@ -173,6 +195,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
             productCost += unitPrice * quantity;
             preparedItems.push({
                 productId,
+                productName: product.Prod_name,
                 quantity,
                 productSize,
                 unitPrice
@@ -236,6 +259,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
         }
 
         const validatedShippingId = Number(shippingResult.rows[0].Shipping_id);
+        const shippingName = shippingResult.rows[0].Shipping_name;
         const shippingFee = Number(shippingResult.rows[0].Cost);
         const totalCost = productCost + shippingFee - discount;
 
@@ -390,10 +414,38 @@ router.post("/", checkAuth("user"), async (req, res) => {
         await transaction.commit();
         transaction = null;
 
+        let confirmationEmailSent = false;
+
+        try {
+            await sendOrderConfirmation({
+                customerEmail,
+                customerName,
+                orderId,
+                items: preparedItems,
+                productCost: Number(productCost.toFixed(2)),
+                discount: Number(discount.toFixed(2)),
+                shippingName,
+                shippingFee: Number(shippingFee.toFixed(2)),
+                totalCost: Number(totalCost.toFixed(2))
+            });
+
+            confirmationEmailSent = true;
+
+        } catch (emailError) {
+            console.error(
+                "Order saved, but confirmation email failed:",
+                emailError
+            );
+        }
+
         return res.status(201).json({
             success: true,
-            message: "Order placed successfully",
+            message: confirmationEmailSent
+                ? "Order placed successfully. A confirmation email was sent."
+                : "Order placed successfully, but the confirmation email could not be sent.",
+
             orderId,
+            emailSent: confirmationEmailSent,
             shippingId: validatedShippingId,
             shippingFee: Number(shippingFee.toFixed(2)),
             productCost: Number(productCost.toFixed(2)),

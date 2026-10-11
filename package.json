@@ -29,6 +29,7 @@
     "google-auth-library": "^11.1.0",
     "jsonwebtoken": "^9.0.3",
     "mailgun.js": "^14.0.0",
+    "nodemailer": "^10.1.0",
     "nodemon": "^3.1.14",
     "path": "^0.12.7"
   }
