@@ -58,6 +58,38 @@ router.post("/create-order", checkAuth("user"), async (req, res) => {
         if (!Number.isFinite(amount) || amount <= 0) {
             return res.status(400).json({ error: "A valid checkout total is required" });
         }
+        const addressId = Number(req.body.addressId);
+        if (!Number.isInteger(addressId) || addressId <= 0) {
+            return res.status(400).json({ error: "Select a valid delivery address" });
+        }
+
+        const addressResult = await db.execute({
+            sql: `
+                SELECT
+                    a.Street_address,
+                    a.City,
+                    a.Zip_code,
+                    c.first_name,
+                    c.last_name
+                FROM Address a
+                INNER JOIN Customer c ON c.Customer_id = a.Customer_id
+                WHERE a.Address_id = ?
+                AND a.Customer_id = ?
+            `,
+            args: [addressId, Number(req.user.userId)]
+        });
+        if (addressResult.rows.length === 0) {
+            return res.status(400).json({ error: "The selected delivery address is invalid" });
+        }
+
+        const selectedAddress = addressResult.rows[0];
+        const addressLine = String(selectedAddress.Street_address || "").trim();
+        const city = String(selectedAddress.City || "").trim();
+        const postalCode = String(selectedAddress.Zip_code || "").trim();
+        const customerName = `${selectedAddress.first_name || ""} ${selectedAddress.last_name || ""}`.trim();
+        if (!addressLine || !city || !postalCode || !customerName) {
+            return res.status(400).json({ error: "Complete your delivery address and customer name before paying" });
+        }
 
         const accessToken = await generateAccessToken();
         const response = await axios.post(
@@ -66,11 +98,28 @@ router.post("/create-order", checkAuth("user"), async (req, res) => {
                 intent: "CAPTURE",
                 purchase_units: [{
                     custom_id: String(req.user.userId),
+                    shipping: {
+                        name: { full_name: customerName },
+                        address: {
+                            address_line_1: addressLine,
+                            admin_area_2: city,
+                            postal_code: postalCode,
+                            country_code: "PH"
+                        }
+                    },                    
                     amount: {
                         currency_code: "PHP",
                         value: amount.toFixed(2)
                     }
-                }]
+                }],
+                payment_source: {
+                    paypal: {
+                        experience_context: {
+                            landing_page: "LOGIN",
+                            shipping_preference: "SET_PROVIDED_ADDRESS"
+                        }
+                    }
+                }                
             },
             { headers: { Authorization: `Bearer ${accessToken}` } }
         );

@@ -342,13 +342,17 @@ async function checkout_Yes() {
             await loadPayPalSdk();
 
             await window.paypal.Buttons({
+                fundingSource: window.paypal.FUNDING.PAYPAL,
                 createOrder: async () => {
                     const displayedTotal = document.getElementById("totalCostValue")?.textContent || "";
                     const totalCost = Number(displayedTotal.replace(/[^0-9.]/g, ""));
                     const response = await fetch("/paypal/create-order", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ totalCost })
+                        body: JSON.stringify({
+                            totalCost,
+                            addressId: payload.addressId
+                        })
                     });
                     const result = await response.json();
                     if (!response.ok) throw new Error(result.error || "Unable to start PayPal payment");
