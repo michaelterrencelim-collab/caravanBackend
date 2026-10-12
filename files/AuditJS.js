@@ -1,12 +1,6 @@
-// AuditJS.js
-// Audit Trail page. Reads real logs from GET /admin/api/audit
-// (auditApi.js) and keeps the existing markup/classes from Audit.html.
-
 document.addEventListener("DOMContentLoaded", () => {
-  const API = "/admin/api";
+  const API = "/api";
   const PAGE_SIZE = 10;
-
-  // The "Sort by" button cycles through these time ranges
   const RANGES = [
     { key: "week", label: "this week" },
     { key: "today", label: "today" },
@@ -14,7 +8,6 @@ document.addEventListener("DOMContentLoaded", () => {
     { key: "all", label: "all time" },
   ];
 
-  const tabs = document.querySelectorAll("#actionTabs .tab");
   const logList = document.getElementById("logList");
   const searchInput = document.getElementById("logSearch");
   const exportBtn = document.getElementById("exportBtn");
@@ -22,29 +15,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const pageIndicator = document.getElementById("pageIndicator");
   const prevPageBtn = document.getElementById("prevPageBtn");
   const nextPageBtn = document.getElementById("nextPageBtn");
+  const tabs = document.getElementById("actionTabs");
+  if (tabs) tabs.style.display = "none";
+  if (sortBtn) sortBtn.style.marginLeft = "auto";
 
-  const state = { type: "all", search: "", rangeIndex: 0, page: 1, totalPages: 1 };
-  let requestCounter = 0; // ignore out-of-date responses while typing/clicking fast
+  const state = { search: "", rangeIndex: 0, page: 1, totalPages: 1 };
+  let requestCounter = 0; 
 
-  // ---------- Icons (same SVGs as the original static rows) ----------
-  const ICONS = {
-    deleted: {
-      cls: "log-icon-delete",
-      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>',
-    },
-    updated: {
-      cls: "log-icon-update",
-      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>',
-    },
-    created: {
-      cls: "log-icon-create",
-      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>',
-    },
-    "sign-in": {
-      cls: "log-icon-signin",
-      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>',
-    },
-  };
+  const ICON =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke-linejoin="round"/><path d="M9 11h6M9 15h6" stroke-linecap="round"/></svg>';
 
   // ---------- Helpers ----------
   function esc(value) {
@@ -55,13 +34,9 @@ document.addEventListener("DOMContentLoaded", () => {
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
   }
-
-  // Escape first (so nothing can inject HTML), then bold the "quoted" names
   function formatDescription(text) {
     return esc(text).replace(/&quot;(.+?)&quot;/g, "<strong>&quot;$1&quot;</strong>");
   }
-
-  // "Today: 2:41PM", "Yesterday: 9:05AM", "Oct 5: 4:10PM"
   function formatTime(isoString) {
     const date = new Date(isoString);
     if (isNaN(date)) return "";
@@ -81,24 +56,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function buildQuery(extra = {}) {
     const params = new URLSearchParams(extra);
-    if (state.type !== "all") params.set("type", state.type);
     if (state.search) params.set("search", state.search);
     const range = RANGES[state.rangeIndex].key;
     if (range !== "all") params.set("range", range);
     return params;
   }
 
+  // fetch -> check response -> JSON (same checks productpage.js does)
   async function api(path) {
     const res = await fetch(`${API}${path}`, { credentials: "same-origin" });
+    const isJson = (res.headers.get("content-type") || "").includes("application/json");
+
     let data = null;
-    try {
-      data = await res.json();
-    } catch (_) {
-      /* non-JSON response */
+    if (isJson) {
+      try {
+        data = await res.json();
+      } catch (_) {
+        /* ignore */
+      }
     }
+
     if (!res.ok) {
       const error = new Error((data && data.error) || `Request failed (${res.status})`);
       error.status = res.status;
+      throw error;
+    }
+    if (res.redirected || !isJson) {
+      const error = new Error("The server sent back a page instead of data. Are you signed in as an admin?");
+      error.status = 401;
       throw error;
     }
     return data;
@@ -116,15 +101,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     logList.innerHTML = logs
-      .map((log) => {
-        const icon = ICONS[log.action_type] || ICONS.updated;
-        return `
-          <li class="log-row" data-type="${esc(log.action_type)}">
-            <span class="log-icon ${icon.cls}" aria-hidden="true">${icon.svg}</span>
+      .map(
+        (log) => `
+          <li class="log-row">
+            <span class="log-icon log-icon-signin" aria-hidden="true">${ICON}</span>
             <p class="log-text"><strong>${esc(log.actor_name)}</strong> ${formatDescription(log.description)}</p>
             <span class="log-time">${esc(formatTime(log.action_date))}</span>
-          </li>`;
-      })
+          </li>`
+      )
       .join("");
   }
 
@@ -149,12 +133,11 @@ document.addEventListener("DOMContentLoaded", () => {
     showMessage("Loading logs...");
 
     try {
-      const data = await api(`/audit?${buildQuery({ page: state.page, limit: PAGE_SIZE })}`);
+      const data = await api(`/fetchAuditLogs?${buildQuery({ page: state.page, limit: PAGE_SIZE })}`);
       if (requestId !== requestCounter) return; // a newer request replaced this one
+      console.log("AUDIT RESPONSE:", data);
 
       state.totalPages = data.totalPages;
-
-      // e.g. the last page no longer exists after filtering
       if (state.page > data.totalPages) {
         state.page = data.totalPages;
         return loadLogs();
@@ -164,11 +147,11 @@ document.addEventListener("DOMContentLoaded", () => {
       updatePager();
     } catch (error) {
       if (requestId !== requestCounter) return;
-      console.error("Failed to load audit trail:", error);
+      console.error("Error loading audit trail:", error);
       showMessage(
         error.status === 401 || error.status === 403
-          ? "You are not authorized to view the audit trail."
-          : "Failed to load the audit trail. Please try again."
+          ? `You are not signed in as an admin (${error.status}).`
+          : `Failed to load the audit trail: ${error.message}`
       );
       state.totalPages = 1;
       updatePager();
@@ -181,15 +164,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ---------- Events ----------
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      tabs.forEach((t) => t.classList.remove("is-active"));
-      tab.classList.add("is-active");
-      state.type = tab.dataset.filter;
-      reloadFromFirstPage();
-    });
-  });
-
   let searchTimer;
   if (searchInput) {
     searchInput.addEventListener("input", () => {
@@ -211,8 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (exportBtn) {
     exportBtn.addEventListener("click", () => {
-      // Exports everything that matches the current tab, search and range
-      window.location.href = `${API}/audit/export?${buildQuery()}`;
+      window.location.href = `${API}/exportAuditLogs?${buildQuery()}`;
     });
   }
 
@@ -230,7 +203,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ---------- Start ----------
   updateSortLabel();
   loadLogs();
 });

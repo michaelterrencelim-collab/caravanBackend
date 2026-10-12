@@ -1,790 +1,424 @@
-const express = require("express");
-const router = express.Router();
-const db = require("../../imports/database");
-const { requireAuth } = require("../../imports/token");
-const { logAudit, getAdminId } = require("../Audit/AuditImport");
+document.addEventListener("DOMContentLoaded", () => {
+  const API = "/api";
+  const PAGE_SIZE = 10;
 
-// Mounted at /admin/api  (e.g. GET /admin/api/orders, GET /admin/api/stocks)
-router.customPath = "/admin/api";
+  const filterPills = document.querySelectorAll(".filter-pill");
+  const stockBody = document.getElementById("stockBody");
+  const searchInput = document.getElementById("stockSearch");
+  const exportBtn = document.getElementById("exportBtn");
+  const prevPageBtn = document.getElementById("prevPageBtn");
+  const nextPageBtn = document.getElementById("nextPageBtn");
+  const pageIndicator = document.getElementById("pageIndicator");
+  const pageSubtitle = document.getElementById("pageSubtitle");
 
-// ---------------------------------------------------------------------------
-// CONFIG
-// ---------------------------------------------------------------------------
-const LOW_STOCK_THRESHOLD = 20; // amount <= this (and > 0) = "Low on Stock"
-const STATUS_RETURNED = "Returned"; // must match a row in Order_status
-const STATUS_REFUNDED = "Refunded"; // must match a row in Order_status
-const RETURN_STATUS_DEFAULT = "Received"; // value written to Returns.return_status
-const DEFAULT_LIMIT = 10;
-const MAX_LIMIT = 100;
+  const state = { filter: "all", search: "", page: 1, totalPages: 1 };
+  let requestCounter = 0; // ignore out-of-date responses while typing/clicking fast
 
-// ---------------------------------------------------------------------------
-// HELPERS
-// ---------------------------------------------------------------------------
-function getPaging(query) {
-  const page = Math.max(1, parseInt(query.page, 10) || 1);
-  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(query.limit, 10) || DEFAULT_LIMIT));
-  return { page, limit, offset: (page - 1) * limit };
-}
+  const THUMB_SVG =
+    '<svg viewBox="0 0 24 24" fill="none"><rect x="4" y="6" width="16" height="13" rx="1.6" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="11" r="1.6" fill="currentColor"/><path d="m5 17 4.5-4.5L13 16l2.5-2.5L19 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-// Escape % and _ so user input is matched literally in LIKE
-function likeParam(text) {
-  return `%${String(text).replace(/[\\%_]/g, "\\$&")}%`;
-}
+  const ACTIONS_HTML = `
+    <div class="row-actions">
+      <a href="#" class="action-adjust"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12h6M14 12h6M9 6h6M9 18h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="12" r="2" stroke="currentColor" stroke-width="1.6"/></svg>Adjust Stocks</a>
+      <a href="#" class="action-edit"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h2l1.4 9.6A2 2 0 0 0 9.4 17H18a2 2 0 0 0 2-1.6L21 9H6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.5" cy="20" r="1.2" fill="currentColor"/><circle cx="17" cy="20" r="1.2" fill="currentColor"/></svg>Order Stocks</a>
+      <a href="#" class="action-delete"><svg viewBox="0 0 24 24" fill="none"><path d="M8 8H16.5A3.5 3.5 0 0 1 20 11.5v0A3.5 3.5 0 0 1 16.5 15H6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="m10 4-4 4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Log a return</a>
+    </div>`;
 
-function round2(n) {
-  return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
-}
+  // ---------- Small styles for the forms + toast (uses AdminCSS variables) ----------
+  const style = document.createElement("style");
+  style.textContent = `
+    .status-out { color: var(--red); }
+    .product-thumb { overflow: hidden; }
+    .product-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .si-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+    .si-modal { width: 440px; max-width: 100%; max-height: 90vh; overflow-y: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; color: var(--text-primary); }
+    .si-modal h2 { margin: 0 0 4px; font-size: 1.1rem; color: var(--gold); }
+    .si-modal .si-sub { margin: 0 0 16px; font-size: .88rem; color: var(--text-secondary); }
+    .si-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; font-size: .88rem; color: var(--text-secondary); }
+    .si-field input, .si-field select, .si-field textarea { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text-primary); font: inherit; }
+    .si-field input:focus, .si-field select:focus, .si-field textarea:focus { outline: none; border-color: var(--gold); }
+    .si-check { flex-direction: row; align-items: center; gap: 8px; }
+    .si-error { min-height: 18px; margin: 0 0 10px; font-size: .86rem; color: var(--red); }
+    .si-buttons { display: flex; justify-content: flex-end; gap: 10px; }
+    .si-buttons .btn { padding: 10px 18px; }
+    .si-toast { position: fixed; right: 24px; bottom: 24px; background: var(--card-bg); border: 1px solid var(--gold-dim); color: var(--text-primary); border-radius: 10px; padding: 12px 18px; font-size: .9rem; z-index: 1100; box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+    .si-toast.is-error { border-color: var(--red); color: var(--red); }
+  `;
+  document.head.appendChild(style);
 
-function stockStatus(amount) {
-  const n = Number(amount);
-  if (n <= 0) return { status: "out-of-stock", level: "out", label: "Out of Stock" };
-  if (n <= LOW_STOCK_THRESHOLD) return { status: "low-stock", level: "low", label: "Low On Stock" };
-  return { status: "in-stock", level: "full", label: "In Stock" };
-}
-
-// ---------------------------------------------------------------------------
-// ORDERS
-// ---------------------------------------------------------------------------
-
-// GET /admin/api/order-statuses
-router.get("/order-statuses", requireAuth("admin"), async (req, res) => {
-  try {
-    const result = await db.execute("SELECT Status_id, Order_status FROM Order_status ORDER BY Status_id");
-    res.json(result.rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Unable to load order statuses" });
+  // ---------- Helpers ----------
+  function esc(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
-});
-
-// GET /admin/api/orders?status=&search=&from=&to=&sort=&page=&limit=
-//   status : Status_id
-//   search : order id, customer name or customer email
-//   from/to: YYYY-MM-DD
-//   sort   : date-desc | date-asc | total-desc | total-asc | id-desc | id-asc
-router.get("/orders", requireAuth("admin"), async (req, res) => {
-  try {
-    const { status, customer, search, from, to, sort } = req.query;
-    const fetchAll = req.query.all === "true"; // report mode: no paging (capped at 5000)
-    const { page, limit, offset } = getPaging(req.query);
-
-    const where = [];
-    const args = [];
-
-    if (status) {
-      where.push("o.Status_id = ?");
-      args.push(Number(status));
-    }
-    if (customer) {
-      where.push("o.Customer_id = ?");
-      args.push(Number(customer));
-    }
-    if (search) {
-      const like = likeParam(search);
-      where.push(
-        `(CAST(o.Order_id AS TEXT) LIKE ? ESCAPE '\\'
-          OR (c.first_name || ' ' || c.last_name) LIKE ? ESCAPE '\\'
-          OR c.Cus_email LIKE ? ESCAPE '\\')`
-      );
-      args.push(like, like, like);
-    }
-    if (from) {
-      where.push("date(o.Order_date) >= date(?)");
-      args.push(from);
-    }
-    if (to) {
-      where.push("date(o.Order_date) <= date(?)");
-      args.push(to);
-    }
-
-    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-
-    const sortMap = {
-      "date-desc": "o.Order_date DESC",
-      "date-asc": "o.Order_date ASC",
-      "total-desc": "o.Total_cost DESC",
-      "total-asc": "o.Total_cost ASC",
-      "id-desc": "o.Order_id DESC",
-      "id-asc": "o.Order_id ASC",
-    };
-    const orderBy = sortMap[sort] || sortMap["date-desc"];
-
-    const countResult = await db.execute({
-      sql: `
-        SELECT COUNT(*) AS total
-        FROM Orders o
-        LEFT JOIN Customer c ON o.Customer_id = c.Customer_id
-        ${whereSql}
-      `,
-      args,
-    });
-    const total = Number(countResult.rows[0].total);
-
-    const result = await db.execute({
-      sql: `
-        SELECT
-          o.Order_id,
-          o.Order_date,
-          o.Total_cost,
-          o.Shipping_fee,
-          o.Status_id,
-          os.Order_status,
-          o.Customer_id,
-          (c.first_name || ' ' || c.last_name) AS Customer_name,
-          (SELECT COALESCE(SUM(oi.Quantity), 0)
-             FROM Order_items oi
-            WHERE oi.Order_id = o.Order_id) AS Item_count
-        FROM Orders o
-        INNER JOIN Order_status os ON o.Status_id = os.Status_id
-        LEFT JOIN Customer c ON o.Customer_id = c.Customer_id
-        ${whereSql}
-        ORDER BY ${orderBy}
-        ${fetchAll ? "LIMIT 5000" : "LIMIT ? OFFSET ?"}
-      `,
-      args: fetchAll ? args : [...args, limit, offset],
-    });
-
-    res.json({
-      orders: result.rows,
-      page,
-      limit,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-    });
-  } catch (error) {
-    console.error("Error loading admin orders:", error);
-    res.status(500).json({ error: "Unable to load orders" });
+  function imageSrc(path) {
+    if (!path) return "";
+    return /^(https?:|data:|\/)/i.test(path) ? path : `/${path}`;
   }
-});
-
-// GET /admin/api/orders/:orderId -> full order (customer, address, payment, items)
-router.get("/orders/:orderId", requireAuth("admin"), async (req, res) => {
-  try {
-    const orderId = Number(req.params.orderId);
-    if (!Number.isInteger(orderId)) return res.status(400).json({ error: "Invalid order id" });
-
-    const result = await db.execute({
-      sql: `
-        SELECT
-          o.Order_id,
-          o.Order_date,
-          o.Total_cost,
-          o.Shipping_fee,
-          o.Status_id,
-          os.Order_status,
-
-          c.Customer_id,
-          c.first_name,
-          c.last_name,
-          c.Cus_email,
-          c.Cus_phone,
-
-          a.Street_address,
-          a.City,
-          a.Zip_code,
-
-          pm.Payment_method AS Payment_method,
-
-          oi.Order_item_id,
-          oi.Product_id,
-          oi.Product_Size,
-          oi.Quantity,
-          oi.Unit_price,
-          p.Prod_name,
-          p.Prod_img,
-
-          (SELECT r.return_status
-             FROM Returns r
-            WHERE r.order_item_id = oi.Order_item_id
-            ORDER BY r.request_date DESC
-            LIMIT 1) AS Return_status
-        FROM Orders o
-        INNER JOIN Order_status os ON o.Status_id = os.Status_id
-        LEFT JOIN Customer c ON o.Customer_id = c.Customer_id
-        LEFT JOIN Address a ON o.Address_id = a.Address_id
-        LEFT JOIN Payment_method pm ON o.Method_id = pm.Method_id
-        INNER JOIN Order_items oi ON o.Order_id = oi.Order_id
-        INNER JOIN Product p ON oi.Product_id = p.Product_id
-        WHERE o.Order_id = ?
-        ORDER BY oi.Order_item_id
-      `,
-      args: [orderId],
+  async function api(path, options = {}) {
+    const res = await fetch(`${API}${path}`, {
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      method: options.method || "GET",
+      body: options.body ? JSON.stringify(options.body) : undefined,
     });
+    const isJson = (res.headers.get("content-type") || "").includes("application/json");
 
-    if (!result.rows.length) return res.status(404).json({ error: "Order not found" });
+    let data = null;
+    if (isJson) {
+      try {
+        data = await res.json();
+      } catch (_) {
+        /* ignore */
+      }
+    }
 
-    const first = result.rows[0];
-    const items = result.rows.map((r) => ({
-      Order_item_id: r.Order_item_id,
-      Product_id: r.Product_id,
-      Prod_name: r.Prod_name,
-      Prod_img: r.Prod_img,
-      Product_size: r.Product_Size,
-      Quantity: Number(r.Quantity),
-      Unit_price: Number(r.Unit_price),
-      Return_status: r.Return_status || null,
-    }));
-
-    const subtotal = round2(items.reduce((sum, i) => sum + i.Quantity * i.Unit_price, 0));
-    const shipping = Number(first.Shipping_fee) || 0;
-    const total = Number(first.Total_cost) || 0;
-
-    res.json({
-      Order_id: first.Order_id,
-      Order_date: first.Order_date,
-      Status_id: first.Status_id,
-      Order_status: first.Order_status,
-      Customer: {
-        Customer_id: first.Customer_id,
-        name: first.first_name ? `${first.first_name} ${first.last_name}` : null,
-        email: first.Cus_email,
-        phone: first.Cus_phone,
-      },
-      Address: {
-        Street_address: first.Street_address,
-        City: first.City,
-        Zip_code: first.Zip_code,
-      },
-      Payment_method: first.Payment_method || null,
-      Subtotal: subtotal,
-      Shipping_fee: shipping,
-      Total_cost: total,
-      items,
-    });
-  } catch (error) {
-    console.error("Error loading admin order:", error);
-    res.status(500).json({ error: "Unable to retrieve order" });
+    if (!res.ok) {
+      const error = new Error((data && data.error) || `Request failed (${res.status})`);
+      error.status = res.status;
+      throw error;
+    }
+    if (res.redirected || !isJson) {
+      const error = new Error("The server sent back a page instead of data. Are you signed in as an admin?");
+      error.status = 401;
+      throw error;
+    }
+    return data;
   }
-});
 
-// PATCH /admin/api/orders/:orderId/status   body: { status_id }
-router.patch("/orders/:orderId/status", requireAuth("admin"), async (req, res) => {
-  try {
-    const orderId = Number(req.params.orderId);
-    const statusId = Number(req.body.status_id);
-    if (!Number.isInteger(orderId) || !Number.isInteger(statusId)) {
-      return res.status(400).json({ error: "order id and status_id must be integers" });
-    }
-
-    const current = await db.execute({
-      sql: `
-        SELECT os.Order_status
-        FROM Orders o
-        INNER JOIN Order_status os ON o.Status_id = os.Status_id
-        WHERE o.Order_id = ?
-      `,
-      args: [orderId],
-    });
-    if (!current.rows.length) return res.status(404).json({ error: "Order not found" });
-
-    const next = await db.execute({
-      sql: "SELECT Order_status FROM Order_status WHERE Status_id = ?",
-      args: [statusId],
-    });
-    if (!next.rows.length) return res.status(400).json({ error: "Unknown status" });
-
-    const oldStatus = current.rows[0].Order_status;
-    const newStatus = next.rows[0].Order_status;
-
-    await db.execute({
-      sql: "UPDATE Orders SET Status_id = ? WHERE Order_id = ?",
-      args: [statusId, orderId],
-    });
-
-    await logAudit({
-      adminId: getAdminId(req),
-      type: "updated",
-      description: `Updated Order "#${orderId}" status from ${oldStatus} → ${newStatus}`,
-    });
-
-    res.json({ message: "Order status updated", Order_id: orderId, Order_status: newStatus });
-  } catch (error) {
-    console.error("Error updating order status:", error);
-    res.status(500).json({ error: "Unable to update order status" });
+  let toastTimer;
+  function toast(message, isError = false) {
+    document.querySelectorAll(".si-toast").forEach((t) => t.remove());
+    const node = document.createElement("div");
+    node.className = `si-toast${isError ? " is-error" : ""}`;
+    node.textContent = message;
+    document.body.appendChild(node);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => node.remove(), 3500);
   }
-});
 
-// GET /admin/api/order-summary -> order count and money per status (Orders Reports header cards)
-router.get("/order-summary", requireAuth("admin"), async (req, res) => {
-  try {
-    const result = await db.execute(`
-      SELECT
-        os.Status_id,
-        os.Order_status,
-        COUNT(o.Order_id) AS order_count,
-        COALESCE(SUM(o.Total_cost), 0) AS total_amount
-      FROM Order_status os
-      LEFT JOIN Orders o ON o.Status_id = os.Status_id
-      GROUP BY os.Status_id, os.Order_status
-      ORDER BY os.Status_id
-    `);
-    const statuses = result.rows.map((r) => ({
-      Status_id: r.Status_id,
-      Order_status: r.Order_status,
-      order_count: Number(r.order_count),
-      total_amount: round2(r.total_amount),
-    }));
-    res.json({
-      totalOrders: statuses.reduce((n, s) => n + s.order_count, 0),
-      statuses,
-    });
-  } catch (error) {
-    console.error("Error loading order summary:", error);
-    res.status(500).json({ error: "Unable to load order summary" });
-  }
-});
+  // ---------- Generic form modal ----------
+  function openForm({ title, subtitle, fields, submitLabel, onSubmit }) {
+    const overlay = document.createElement("div");
+    overlay.className = "si-overlay";
 
-// Shared logic for "set this order to a named status" (return / refund).
-// The target status is looked up by NAME in the Order_status table, so the
-// row must exist there (e.g. Status_id 6 = "Returned", 7 = "Refunded").
-async function setOrderStatusByName(req, res, { targetName, blockedFrom }) {
-  try {
-    const orderId = Number(req.params.orderId);
-    if (!Number.isInteger(orderId)) return res.status(400).json({ error: "Invalid order id" });
-
-    const current = await db.execute({
-      sql: `
-        SELECT o.Status_id, os.Order_status
-        FROM Orders o
-        INNER JOIN Order_status os ON o.Status_id = os.Status_id
-        WHERE o.Order_id = ?
-      `,
-      args: [orderId],
-    });
-    if (!current.rows.length) return res.status(404).json({ error: "Order not found" });
-
-    const oldStatus = current.rows[0].Order_status;
-    if (blockedFrom.some((n) => n.toLowerCase() === String(oldStatus).toLowerCase())) {
-      return res.status(409).json({ error: `Order #${orderId} is already ${oldStatus}` });
-    }
-
-    const target = await db.execute({
-      sql: "SELECT Status_id, Order_status FROM Order_status WHERE LOWER(Order_status) = LOWER(?)",
-      args: [targetName],
-    });
-    if (!target.rows.length) {
-      return res.status(409).json({
-        error: `The Order_status table has no "${targetName}" row. Add it first, then retry.`,
-      });
-    }
-
-    const { Status_id: targetId, Order_status: targetLabel } = target.rows[0];
-
-    await db.execute({
-      sql: "UPDATE Orders SET Status_id = ? WHERE Order_id = ?",
-      args: [targetId, orderId],
-    });
-
-    const reason = String(req.body.reason || "").trim().slice(0, 120);
-    await logAudit({
-      adminId: getAdminId(req),
-      type: "updated",
-      description:
-        `Marked Order "#${orderId}" as ${targetLabel} (was ${oldStatus})` + (reason ? `: ${reason}` : ""),
-    });
-
-    res.json({
-      message: `Order marked as ${targetLabel}`,
-      Order_id: orderId,
-      Status_id: targetId,
-      Order_status: targetLabel,
-      previous_status: oldStatus,
-    });
-  } catch (error) {
-    console.error("Error changing order status:", error);
-    res.status(500).json({ error: "Unable to update order" });
-  }
-}
-
-// POST /admin/api/orders/:orderId/return    body: { reason? }
-// Sets the order's status to "Returned".
-router.post("/orders/:orderId/return", requireAuth("admin"), (req, res) =>
-  setOrderStatusByName(req, res, {
-    targetName: STATUS_RETURNED,
-    blockedFrom: [STATUS_RETURNED, STATUS_REFUNDED],
-  })
-);
-
-// POST /admin/api/orders/:orderId/refund    body: { reason? }
-// Sets the order's status to "Refunded".
-router.post("/orders/:orderId/refund", requireAuth("admin"), (req, res) =>
-  setOrderStatusByName(req, res, {
-    targetName: STATUS_REFUNDED,
-    blockedFrom: [STATUS_REFUNDED],
-  })
-);
-
-// ---------------------------------------------------------------------------
-// STOCK INVENTORY
-// ---------------------------------------------------------------------------
-
-// GET /admin/api/stocks?filter=all|in-stock|low-stock|out-of-stock&search=&page=&limit=
-router.get("/stocks", requireAuth("admin"), async (req, res) => {
-  try {
-    const filter = req.query.filter || "all";
-    const search = (req.query.search || "").trim();
-    const { page, limit, offset } = getPaging(req.query);
-
-    const where = [];
-    const args = [];
-
-    if (filter === "out-of-stock") {
-      where.push("p.Prod_amount <= 0");
-    } else if (filter === "low-stock") {
-      where.push("p.Prod_amount > 0 AND p.Prod_amount <= ?");
-      args.push(LOW_STOCK_THRESHOLD);
-    } else if (filter === "in-stock") {
-      where.push("p.Prod_amount > ?");
-      args.push(LOW_STOCK_THRESHOLD);
-    }
-
-    if (search) {
-      where.push("(p.Prod_name LIKE ? ESCAPE '\\' OR CAST(p.product_id AS TEXT) LIKE ? ESCAPE '\\')");
-      args.push(likeParam(search), likeParam(search));
-    }
-
-    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-
-    const countResult = await db.execute({
-      sql: `SELECT COUNT(*) AS total FROM Product p ${whereSql}`,
-      args,
-    });
-    const total = Number(countResult.rows[0].total);
-
-    const summaryResult = await db.execute({
-      sql: `
-        SELECT
-          COUNT(*) AS total_products,
-          SUM(CASE WHEN Prod_amount <= 0 THEN 1 ELSE 0 END) AS out_count,
-          SUM(CASE WHEN Prod_amount > 0 AND Prod_amount <= ? THEN 1 ELSE 0 END) AS low_count
-        FROM Product
-      `,
-      args: [LOW_STOCK_THRESHOLD],
-    });
-    const s = summaryResult.rows[0];
-
-    const result = await db.execute({
-      sql: `
-        SELECT p.product_id, p.Prod_name, p.Prod_img, p.Prod_amount
-        FROM Product p
-        ${whereSql}
-        ORDER BY p.Prod_amount ASC, p.product_id ASC
-        LIMIT ? OFFSET ?
-      `,
-      args: [...args, limit, offset],
-    });
-
-    const items = result.rows.map((r) => {
-      const st = stockStatus(r.Prod_amount);
-      return {
-        product_id: r.product_id,
-        product_name: r.Prod_name,
-        product_image: r.Prod_img,
-        stock: Number(r.Prod_amount),
-        status: st.status, // matches data-status on <tr>
-        level: st.level, // level-low | level-full | level-out
-        status_label: st.label,
-      };
-    });
-
-    res.json({
-      items,
-      summary: {
-        totalProducts: Number(s.total_products),
-        lowCount: Number(s.low_count),
-        outCount: Number(s.out_count),
-        needRestock: Number(s.low_count) + Number(s.out_count),
-        lowStockThreshold: LOW_STOCK_THRESHOLD,
-      },
-      page,
-      limit,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-    });
-  } catch (error) {
-    console.error("Error loading stocks:", error);
-    res.status(500).json({ error: "Unable to load stock inventory" });
-  }
-});
-
-// GET /admin/api/stocks/:productId/history -> Stock_adjustments for one product
-router.get("/stocks/:productId/history", requireAuth("admin"), async (req, res) => {
-  try {
-    const productId = Number(req.params.productId);
-    if (!Number.isInteger(productId)) return res.status(400).json({ error: "Invalid product id" });
-    const { page, limit, offset } = getPaging(req.query);
-
-    const result = await db.execute({
-      sql: `
-        SELECT
-          sa.Adjustment_id,
-          sa.quantity_change,
-          strftime('%Y-%m-%dT%H:%M:%SZ', sa.Adjustment_date) AS Adjustment_date,
-          COALESCE(SUBSTR(ad.First_name, 1, 1) || '. ' || ad.Last_name, 'System') AS admin_name
-        FROM Stock_adjustments sa
-        LEFT JOIN Admin ad ON sa.Admin_id = ad.Admin_id
-        WHERE sa.product_id = ?
-        ORDER BY sa.Adjustment_date DESC, sa.Adjustment_id DESC
-        LIMIT ? OFFSET ?
-      `,
-      args: [productId, limit, offset],
-    });
-    res.json({ history: result.rows, page, limit });
-  } catch (error) {
-    console.error("Error loading stock history:", error);
-    res.status(500).json({ error: "Unable to load stock history" });
-  }
-});
-
-// POST /admin/api/stocks/:productId/adjust
-//   body: { new_amount: 50 } (set absolute)  OR  { delta: -5 } (add/subtract)
-// Updates Product.Prod_amount, writes a Stock_adjustments row and an Audit row.
-router.post("/stocks/:productId/adjust", requireAuth("admin"), async (req, res) => {
-  try {
-    const productId = Number(req.params.productId);
-    if (!Number.isInteger(productId)) return res.status(400).json({ error: "Invalid product id" });
-
-    const current = await db.execute({
-      sql: "SELECT Prod_name, Prod_amount FROM Product WHERE product_id = ?",
-      args: [productId],
-    });
-    if (!current.rows.length) return res.status(404).json({ error: "Product not found" });
-
-    const name = current.rows[0].Prod_name;
-    const oldAmount = Number(current.rows[0].Prod_amount);
-
-    let delta;
-    if (req.body.new_amount !== undefined) delta = Number(req.body.new_amount) - oldAmount;
-    else if (req.body.delta !== undefined) delta = Number(req.body.delta);
-    else return res.status(400).json({ error: "Provide new_amount or delta" });
-
-    if (!Number.isInteger(delta) || delta === 0) {
-      return res.status(400).json({ error: "Change must be a non-zero whole number" });
-    }
-    if (oldAmount + delta < 0) {
-      return res.status(400).json({ error: "Stock cannot go below 0" });
-    }
-
-    // One atomic batch (one round trip on Turso). The stock update is guarded, and the
-    // Stock_adjustments + Audit inserts only run if that update changed a row
-    // (changes() = rows touched by the previous statement), so two admins editing
-    // at once can never leave the three tables out of sync.
-    const adminId = getAdminId(req);
-    const results = await db.batch(
-      [
-        {
-          sql: "UPDATE Product SET Prod_amount = Prod_amount + ? WHERE product_id = ? AND Prod_amount + ? >= 0",
-          args: [delta, productId, delta],
-        },
-        {
-          sql: `
-            INSERT INTO Stock_adjustments (product_id, Admin_id, quantity_change, Adjustment_date)
-            SELECT ?, ?, ?, CURRENT_TIMESTAMP WHERE changes() > 0
-          `,
-          args: [productId, adminId, delta],
-        },
-        {
-          sql: `
-            INSERT INTO Audit (Admin_id, action_type, description, action_date)
-            SELECT ?, 'updated', ?, CURRENT_TIMESTAMP WHERE changes() > 0
-          `,
-          args: [adminId, `Updated Stock for "${name}" from ${oldAmount} → ${oldAmount + delta}`],
-        },
-        { sql: "SELECT Prod_amount FROM Product WHERE product_id = ?", args: [productId] },
-      ],
-      "write"
-    );
-
-    if (!results[0].rowsAffected) {
-      return res.status(409).json({ error: "Stock changed while you were editing. Please refresh and retry." });
-    }
-    const newAmount = Number(results[3].rows[0].Prod_amount);
-
-    res.json({
-      product_id: productId,
-      quantity_change: delta,
-      new_stock: newAmount,
-      ...stockStatus(newAmount),
-    });
-  } catch (error) {
-    console.error("Error adjusting stock:", error);
-    res.status(500).json({ error: "Unable to update stock" });
-  }
-});
-
-// GET /admin/api/stocks/:productId/order-items
-// Recent order lines for this product, for the "Log a return" picker.
-router.get("/stocks/:productId/order-items", requireAuth("admin"), async (req, res) => {
-  try {
-    const productId = Number(req.params.productId);
-    if (!Number.isInteger(productId)) return res.status(400).json({ error: "Invalid product id" });
-
-    const result = await db.execute({
-      sql: `
-        SELECT
-          oi.Order_item_id,
-          oi.Order_id,
-          o.Order_date,
-          oi.Quantity,
-          oi.Unit_price,
-          EXISTS (SELECT 1 FROM Returns r WHERE r.order_item_id = oi.Order_item_id) AS Already_returned
-        FROM Order_items oi
-        INNER JOIN Orders o ON oi.Order_id = o.Order_id
-        WHERE oi.Product_id = ?
-        ORDER BY o.Order_date DESC
-        LIMIT 25
-      `,
-      args: [productId],
-    });
-    res.json(result.rows);
-  } catch (error) {
-    console.error("Error loading order items:", error);
-    res.status(500).json({ error: "Unable to load order items" });
-  }
-});
-
-// POST /admin/api/stocks/:productId/return
-//   body: { order_item_id, reason, quantity?, refund_amount?, restock? }
-//   quantity      defaults to the order line's quantity
-//   refund_amount defaults to quantity x Unit_price
-//   restock       defaults to true (returned units go back into Prod_amount)
-// Writes Returns (+ Stock_adjustments and Product update when restocking) and Audit.
-router.post("/stocks/:productId/return", requireAuth("admin"), async (req, res) => {
-  try {
-    const productId = Number(req.params.productId);
-    const orderItemId = Number(req.body.order_item_id);
-    const reason = String(req.body.reason || "").trim();
-    if (!Number.isInteger(productId) || !Number.isInteger(orderItemId)) {
-      return res.status(400).json({ error: "product id and order_item_id are required" });
-    }
-    if (!reason) return res.status(400).json({ error: "A reason is required" });
-
-    const itemResult = await db.execute({
-      sql: `
-        SELECT oi.Order_item_id, oi.Order_id, oi.Quantity, oi.Unit_price, p.Prod_name
-        FROM Order_items oi
-        INNER JOIN Product p ON oi.Product_id = p.Product_id
-        WHERE oi.Order_item_id = ? AND oi.Product_id = ?
-      `,
-      args: [orderItemId, productId],
-    });
-    if (!itemResult.rows.length) {
-      return res.status(404).json({ error: "That order line does not belong to this product" });
-    }
-    const item = itemResult.rows[0];
-
-    const existing = await db.execute({
-      sql: "SELECT 1 FROM Returns WHERE order_item_id = ? LIMIT 1",
-      args: [orderItemId],
-    });
-    if (existing.rows.length) {
-      return res.status(409).json({ error: "A return is already logged for this order line" });
-    }
-
-    const maxQty = Number(item.Quantity);
-    const qty = req.body.quantity !== undefined ? Number(req.body.quantity) : maxQty;
-    if (!Number.isInteger(qty) || qty < 1 || qty > maxQty) {
-      return res.status(400).json({ error: `Quantity must be a whole number from 1 to ${maxQty}` });
-    }
-
-    const refund =
-      req.body.refund_amount !== undefined
-        ? Number(req.body.refund_amount)
-        : round2(qty * Number(item.Unit_price));
-    if (!Number.isFinite(refund) || refund < 0) {
-      return res.status(400).json({ error: "refund_amount must be 0 or more" });
-    }
-
-    const restock = req.body.restock !== false;
-    const adminId = getAdminId(req);
-
-    const statements = [
-      {
-        sql: `
-          INSERT INTO Returns (order_item_id, reason, return_status, refund_amount, request_date)
-          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-        `,
-        args: [orderItemId, reason, RETURN_STATUS_DEFAULT, refund],
-      },
-    ];
-    if (restock) {
-      statements.push(
-        {
-          sql: "UPDATE Product SET Prod_amount = Prod_amount + ? WHERE product_id = ?",
-          args: [qty, productId],
-        },
-        {
-          sql: `
-            INSERT INTO Stock_adjustments (product_id, Admin_id, quantity_change, Adjustment_date)
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-          `,
-          args: [productId, adminId, qty],
+    const fieldHtml = fields
+      .map((f) => {
+        const id = `si-f-${f.name}`;
+        if (f.type === "checkbox") {
+          return `<label class="si-field si-check"><input type="checkbox" id="${id}" ${f.value ? "checked" : ""}> ${esc(f.label)}</label>`;
         }
+        let control;
+        if (f.type === "select") {
+          control = `<select id="${id}">${f.options
+            .map((o) => `<option value="${esc(o.value)}" ${o.disabled ? "disabled" : ""}>${esc(o.label)}</option>`)
+            .join("")}</select>`;
+        } else if (f.type === "textarea") {
+          control = `<textarea id="${id}" rows="3" placeholder="${esc(f.placeholder || "")}"></textarea>`;
+        } else {
+          control = `<input id="${id}" type="${f.type || "text"}" ${f.min !== undefined ? `min="${f.min}"` : ""} ${f.type === "number" ? 'step="1"' : ""} value="${esc(f.value ?? "")}" placeholder="${esc(f.placeholder || "")}">`;
+        }
+        return `<label class="si-field">${esc(f.label)}${control}</label>`;
+      })
+      .join("");
+
+    overlay.innerHTML = `
+      <form class="si-modal" novalidate>
+        <h2>${esc(title)}</h2>
+        <p class="si-sub">${esc(subtitle || "")}</p>
+        ${fieldHtml}
+        <p class="si-error" role="alert"></p>
+        <div class="si-buttons">
+          <button type="button" class="btn si-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary si-submit">${esc(submitLabel)}</button>
+        </div>
+      </form>`;
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector("form");
+    const errorBox = overlay.querySelector(".si-error");
+    const submitBtn = overlay.querySelector(".si-submit");
+    const close = () => overlay.remove();
+
+    overlay.addEventListener("mousedown", (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector(".si-cancel").addEventListener("click", close);
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorBox.textContent = "";
+
+      const values = {};
+      for (const f of fields) {
+        const input = overlay.querySelector(`#si-f-${f.name}`);
+        values[f.name] = f.type === "checkbox" ? input.checked : input.value.trim();
+        if (f.required && values[f.name] === "") {
+          errorBox.textContent = `${f.label} is required.`;
+          return;
+        }
+      }
+
+      submitBtn.disabled = true;
+      try {
+        await onSubmit(values);
+        close();
+      } catch (error) {
+        errorBox.textContent = error.message || "Something went wrong.";
+        submitBtn.disabled = false;
+      }
+    });
+
+    const first = overlay.querySelector("input:not([type=checkbox]), select, textarea");
+    if (first) first.focus();
+  }
+
+  // ---------- Rendering ----------
+  function colspanMessage(text) {
+    stockBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-secondary)">${esc(text)}</td></tr>`;
+  }
+
+  function statusClass(status) {
+    if (status === "in-stock") return "status-completed";
+    if (status === "low-stock") return "status-processing";
+    return "status-out";
+  }
+
+  function rowHtml(item) {
+    const thumb = item.product_image
+      ? `<img class="si-thumb" src="${esc(imageSrc(item.product_image))}" alt="${esc(item.product_name)}">`
+      : THUMB_SVG;
+
+    return `
+      <tr data-status="${esc(item.status)}" data-id="${esc(item.product_id)}" data-name="${esc(item.product_name)}" data-stock="${esc(item.stock)}">
+        <td><span class="product-thumb">${thumb}</span></td>
+        <td>${esc(item.product_name)}</td>
+        <td class="mono">#${esc(item.product_id)}</td>
+        <td class="mono strong">${esc(item.stock)}</td>
+        <td><span class="level-ring level-${esc(item.level)}"></span></td>
+        <td><span class="status ${statusClass(item.status)}">${esc(item.status_label)}</span></td>
+        <td>${ACTIONS_HTML}</td>
+      </tr>`;
+  }
+
+  function renderRows(items) {
+    if (!items.length) {
+      colspanMessage("No products found.");
+      return;
+    }
+    stockBody.innerHTML = items.map(rowHtml).join("");
+
+    // If an image fails to load, fall back to the placeholder icon
+    stockBody.querySelectorAll("img.si-thumb").forEach((img) => {
+      img.addEventListener("error", () => {
+        img.parentElement.innerHTML = THUMB_SVG;
+      });
+    });
+  }
+
+  function renderSubtitle(summary) {
+    const total = summary.totalProducts;
+    const need = summary.needRestock;
+    const noun = need === 1 ? "product needs" : "products need";
+    pageSubtitle.innerHTML =
+      need > 0
+        ? `${total} products: <span class="stock-warning">Warning ${need} ${noun} restocking</span>`
+        : `${total} products: all well stocked`;
+  }
+
+  function updatePager() {
+    pageIndicator.textContent = `${state.page} out of ${state.totalPages} pages`;
+    prevPageBtn.disabled = state.page <= 1;
+    nextPageBtn.disabled = state.page >= state.totalPages;
+    prevPageBtn.style.opacity = prevPageBtn.disabled ? "0.35" : "";
+    nextPageBtn.style.opacity = nextPageBtn.disabled ? "0.35" : "";
+  }
+
+  function filterQuery(extra = {}) {
+    const params = new URLSearchParams(extra);
+    if (state.filter !== "all") params.set("filter", state.filter);
+    if (state.search) params.set("search", state.search);
+    return params;
+  }
+
+  // ---------- Loading ----------
+  async function loadStocks() {
+    const requestId = ++requestCounter;
+    colspanMessage("Loading stocks...");
+
+    try {
+      const data = await api(`/fetchStocks?${filterQuery({ page: state.page, limit: PAGE_SIZE })}`);
+      if (requestId !== requestCounter) return; // a newer request replaced this one
+      console.log("STOCKS RESPONSE:", data);
+
+      state.totalPages = data.totalPages;
+      renderSubtitle(data.summary);
+
+      if (state.page > data.totalPages) {
+        state.page = data.totalPages;
+        return loadStocks();
+      }
+
+      renderRows(data.items);
+      updatePager();
+    } catch (error) {
+      if (requestId !== requestCounter) return;
+      console.error("Error loading stocks:", error);
+      colspanMessage(
+        error.status === 401 || error.status === 403
+          ? `You are not signed in as an admin (${error.status}).`
+          : `Failed to load stocks: ${error.message}`
       );
+      state.totalPages = 1;
+      updatePager();
     }
-    statements.push({
-      sql: `
-        INSERT INTO Audit (Admin_id, action_type, description, action_date)
-        VALUES (?, 'updated', ?, CURRENT_TIMESTAMP)
-      `,
-      args: [
-        adminId,
-        `Logged a return of ${qty} for "${item.Prod_name}" (Order #${item.Order_id})${restock ? "" : ", not restocked"}`,
+  }
+
+  function reloadFromFirstPage() {
+    state.page = 1;
+    loadStocks();
+  }
+
+  // ---------- Row actions ----------
+  function adjustStock(row) {
+    const { id, name, stock } = row.dataset;
+    openForm({
+      title: "Adjust Stocks",
+      subtitle: `${name} (#${id}). Current stock: ${stock}`,
+      submitLabel: "Save",
+      fields: [{ name: "amount", label: "New stock amount", type: "number", min: 0, value: stock, required: true }],
+      onSubmit: async ({ amount }) => {
+        const newAmount = Number(amount);
+        if (!Number.isInteger(newAmount) || newAmount < 0) throw new Error("Enter a whole number of 0 or more.");
+        if (newAmount === Number(stock)) throw new Error("That is already the current stock.");
+        await api("/adjustStock", { method: "POST", body: { product_id: Number(id), new_amount: newAmount } });
+        toast(`Stock for "${name}" updated to ${newAmount}.`);
+        loadStocks();
+      },
+    });
+  }
+
+  function orderStock(row) {
+    const { id, name } = row.dataset;
+    openForm({
+      title: "Order Stocks",
+      subtitle: `${name} (#${id}). This records the request in the audit trail; use Adjust Stocks once the delivery arrives.`,
+      submitLabel: "Record order",
+      fields: [{ name: "quantity", label: "Quantity to order", type: "number", min: 1, required: true }],
+      onSubmit: async ({ quantity }) => {
+        const qty = Number(quantity);
+        if (!Number.isInteger(qty) || qty < 1) throw new Error("Enter a whole number of 1 or more.");
+        await api("/orderStock", { method: "POST", body: { product_id: Number(id), quantity: qty } });
+        toast(`Stock order for "${name}" recorded.`);
+      },
+    });
+  }
+
+  async function logReturn(row) {
+    const { id, name } = row.dataset;
+
+    let items;
+    try {
+      items = await api(`/fetchReturnableItems?productId=${encodeURIComponent(id)}`);
+    } catch (error) {
+      toast(error.message, true);
+      return;
+    }
+    if (!items.length) {
+      toast(`No orders contain "${name}" yet, so there is nothing to return.`, true);
+      return;
+    }
+
+    const options = items.map((i) => ({
+      value: i.Order_item_id,
+      disabled: Boolean(Number(i.Already_returned)),
+      label: `Order #${i.Order_id} - qty ${i.Quantity}${Number(i.Already_returned) ? " (already returned)" : ""}`,
+    }));
+    if (options.every((o) => o.disabled)) {
+      toast(`Every recent order of "${name}" already has a return logged.`, true);
+      return;
+    }
+    options.sort((a, b) => Number(a.disabled) - Number(b.disabled));
+
+    openForm({
+      title: "Log a return",
+      subtitle: `${name} (#${id})`,
+      submitLabel: "Log return",
+      fields: [
+        { name: "order_item_id", label: "Order line", type: "select", options },
+        { name: "reason", label: "Reason", type: "textarea", placeholder: "Why is it being returned?", required: true },
+        { name: "quantity", label: "Quantity returned (optional)", type: "number", min: 1, placeholder: "Defaults to the full line" },
+        { name: "restock", label: "Add the returned units back to stock", type: "checkbox", value: true },
       ],
+      onSubmit: async (values) => {
+        const body = {
+          product_id: Number(id),
+          order_item_id: Number(values.order_item_id),
+          reason: values.reason,
+          restock: values.restock,
+        };
+        if (values.quantity !== "") body.quantity = Number(values.quantity);
+        await api("/logStockReturn", { method: "POST", body });
+        toast(`Return logged for "${name}".`);
+        loadStocks();
+      },
     });
-
-    // One transaction: either everything is saved or nothing is
-    await db.batch(statements, "write");
-
-    const fresh = await db.execute({
-      sql: "SELECT Prod_amount FROM Product WHERE product_id = ?",
-      args: [productId],
-    });
-    const newAmount = Number(fresh.rows[0].Prod_amount);
-
-    res.status(201).json({
-      message: "Return logged",
-      order_item_id: orderItemId,
-      quantity: qty,
-      refund_amount: refund,
-      restocked: restock,
-      new_stock: newAmount,
-      ...stockStatus(newAmount),
-    });
-  } catch (error) {
-    console.error("Error logging return:", error);
-    res.status(500).json({ error: "Unable to log return" });
   }
-});
 
-// POST /admin/api/stocks/:productId/order    body: { quantity }
-// "Order Stocks": there is no purchase-order table in the ERD, so this only
-// records the request in the Audit table. Stock changes when you use /adjust.
-router.post("/stocks/:productId/order", requireAuth("admin"), async (req, res) => {
-  try {
-    const productId = Number(req.params.productId);
-    const qty = Number(req.body.quantity);
-    if (!Number.isInteger(productId) || !Number.isInteger(qty) || qty <= 0) {
-      return res.status(400).json({ error: "productId and a positive whole quantity are required" });
+  stockBody.addEventListener("click", (e) => {
+    const link = e.target.closest(".row-actions a");
+    if (!link) return;
+    e.preventDefault();
+    const row = link.closest("tr");
+    if (!row || !row.dataset.id) return;
+
+    if (link.classList.contains("action-adjust")) adjustStock(row);
+    else if (link.classList.contains("action-edit")) orderStock(row);
+    else if (link.classList.contains("action-delete")) logReturn(row);
+  });
+
+  // ---------- Filters, search, paging ----------
+  filterPills.forEach((pill) => {
+    pill.addEventListener("click", () => {
+      filterPills.forEach((p) => p.classList.remove("is-active"));
+      pill.classList.add("is-active");
+      state.filter = pill.dataset.filter;
+      reloadFromFirstPage();
+    });
+  });
+
+  let searchTimer;
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      state.search = searchInput.value.trim();
+      reloadFromFirstPage();
+    }, 300);
+  });
+
+  prevPageBtn.addEventListener("click", () => {
+    if (state.page > 1) {
+      state.page -= 1;
+      loadStocks();
     }
+  });
 
-    const current = await db.execute({
-      sql: "SELECT Prod_name FROM Product WHERE product_id = ?",
-      args: [productId],
-    });
-    if (!current.rows.length) return res.status(404).json({ error: "Product not found" });
+  nextPageBtn.addEventListener("click", () => {
+    if (state.page < state.totalPages) {
+      state.page += 1;
+      loadStocks();
+    }
+  });
 
-    await logAudit({
-      adminId: getAdminId(req),
-      type: "created",
-      description: `Ordered ${qty} more stock for "${current.rows[0].Prod_name}"`,
-    });
+  // ---------- Export (CSV of everything matching the current filter + search) ----------
+  exportBtn.addEventListener("click", () => {
+    window.location.href = `${API}/exportStocks?${filterQuery()}`;
+  });
 
-    res.status(201).json({ message: "Stock order recorded", product_id: productId, quantity: qty });
-  } catch (error) {
-    console.error("Error recording stock order:", error);
-    res.status(500).json({ error: "Unable to record stock order" });
-  }
+  // ---------- Start ----------
+  loadStocks();
 });
-
-module.exports = router;

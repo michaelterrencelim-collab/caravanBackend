@@ -26,6 +26,11 @@ function loadRoutes(directory) {
     else if (file.endsWith(".js")) {
       const router = require(filePath);
 
+      if (typeof router !== "function") {
+        console.log(`Skipping non-router module ${filePath}`);
+        return;
+      }
+
       const defaultName = path.basename(file, ".js");
       const routePrefix = router.customPath || `/${defaultName}`;
 
