@@ -154,7 +154,7 @@ async function attachItems(orderRows) {
         p.Prod_img,
         (SELECT r.return_status
            FROM Returns r
-          WHERE r.order_item_id = oi.Order_item_id
+          WHERE r.Order_id = oi.Order_id
           ORDER BY r.request_date DESC
           LIMIT 1) AS Return_status
       FROM Order_items oi
@@ -248,7 +248,7 @@ app.get("/fetchOrders", adminOnly, async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching orders:", error);
-    res.status(500).json({ error: "Failed to fetch orders" });
+    res.status(500).json({ error: `Failed to fetch orders: ${error.message}` });
   }
 });
 
@@ -583,35 +583,36 @@ app.post("/adjustStock", adminOnly, async (req, res) => {
       return res.status(400).json({ error: "Stock cannot go below 0" });
     }
     const adminId = getAdminId(req);
-    const results = await db.batch(
-      [
-        {
-          sql: "UPDATE Product SET Prod_amount = Prod_amount + ? WHERE product_id = ? AND Prod_amount + ? >= 0",
-          args: [delta, productId, delta],
-        },
-        {
-          sql: `
-            INSERT INTO Stock_adjustments (product_id, Admin_id, quantity_change, Adjustment_date)
-            SELECT ?, ?, ?, CURRENT_TIMESTAMP WHERE changes() > 0
-          `,
-          args: [productId, adminId, delta],
-        },
-        {
-          sql: `
-            INSERT INTO Audit (Admin_id, action_type, description, action_date)
-            SELECT ?, 'action', ?, CURRENT_TIMESTAMP WHERE changes() > 0
-          `,
-          args: [adminId, `Updated Stock for "${name}" from ${oldAmount} → ${oldAmount + delta}`],
-        },
-        { sql: "SELECT Prod_amount FROM Product WHERE product_id = ?", args: [productId] },
-      ],
-      "write"
-    );
+    const newAmount = oldAmount + delta;
 
-    if (!results[0].rowsAffected) {
+    // Step 1: guarded update. Only succeeds if stock is still what the admin saw.
+    const update = await db.execute({
+      sql: "UPDATE Product SET Prod_amount = ? WHERE product_id = ? AND Prod_amount = ?",
+      args: [newAmount, productId, oldAmount],
+    });
+    if (!update.rowsAffected) {
       return res.status(409).json({ error: "Stock changed while you were editing. Please refresh and retry." });
     }
-    const newAmount = Number(results[3].rows[0].Prod_amount);
+
+    // Step 2: history + audit. Plain inserts (no changes() trick), and a failure here
+    // must not make the admin think the stock update failed, since it already succeeded.
+    try {
+      await db.batch(
+        [
+          {
+            sql: "INSERT INTO Stock_adjustments (product_id, Admin_id, quantity_change, Adjustment_date) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+            args: [productId, adminId, delta],
+          },
+          {
+            sql: "INSERT INTO Audit (Admin_id, action_type, description, action_date) VALUES (?, 'action', ?, CURRENT_TIMESTAMP)",
+            args: [adminId, `Updated Stock for "${name}" from ${oldAmount} → ${newAmount}`],
+          },
+        ],
+        "write"
+      );
+    } catch (logError) {
+      console.error("Stock updated but history/audit write failed:", logError);
+    }
 
     res.json({
       product_id: productId,
@@ -621,7 +622,7 @@ app.post("/adjustStock", adminOnly, async (req, res) => {
     });
   } catch (error) {
     console.error("Error adjusting stock:", error);
-    res.status(500).json({ error: "Failed to adjust stock" });
+    res.status(500).json({ error: `Failed to adjust stock: ${error.message}` });
   }
 });
 app.get("/fetchReturnableItems", adminOnly, async (req, res) => {
@@ -637,7 +638,7 @@ app.get("/fetchReturnableItems", adminOnly, async (req, res) => {
           o.Order_date,
           oi.Quantity,
           oi.Unit_price,
-          EXISTS (SELECT 1 FROM Returns r WHERE r.order_item_id = oi.Order_item_id) AS Already_returned
+          EXISTS (SELECT 1 FROM Returns r WHERE r.Order_id = oi.Order_id) AS Already_returned
         FROM Order_items oi
         INNER JOIN Orders o ON oi.Order_id = o.Order_id
         WHERE oi.Product_id = ?
@@ -678,11 +679,11 @@ app.post("/logStockReturn", adminOnly, async (req, res) => {
     const item = itemResult.rows[0];
 
     const existing = await db.execute({
-      sql: "SELECT 1 FROM Returns WHERE order_item_id = ? LIMIT 1",
-      args: [orderItemId],
+      sql: "SELECT 1 FROM Returns WHERE Order_id = ? LIMIT 1",
+      args: [item.Order_id],
     });
     if (existing.rows.length) {
-      return res.status(409).json({ error: "A return is already logged for this order line" });
+      return res.status(409).json({ error: "A return is already logged for this order" });
     }
 
     const maxQty = Number(item.Quantity);
@@ -705,10 +706,10 @@ app.post("/logStockReturn", adminOnly, async (req, res) => {
     const statements = [
       {
         sql: `
-          INSERT INTO Returns (order_item_id, reason, return_status, refund_amount, request_date)
+          INSERT INTO Returns (Order_id, Reason, Return_status, Refund_amount, request_date)
           VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         `,
-        args: [orderItemId, reason, RETURN_STATUS_DEFAULT, refund],
+        args: [item.Order_id, reason, RETURN_STATUS_DEFAULT, refund],
       },
     ];
     if (restock) {

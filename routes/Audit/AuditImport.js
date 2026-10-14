@@ -1,8 +1,15 @@
 const db = require("../../imports/database");
 const DEFAULT_ACTION_TYPE = "action";
+const ADMIN_ID_KEYS = ["userId", "adminId", "Admin_id", "admin_id", "id", "sub"];
+
 function getAdminId(req) {
-  const id = Number(req.user && req.user.userId);
-  return Number.isInteger(id) ? id : null;
+  const user = (req && req.user) || {};
+  for (const key of ADMIN_ID_KEYS) {
+    const id = Number(user[key]);
+    if (user[key] !== undefined && user[key] !== null && Number.isInteger(id)) return id;
+  }
+  console.warn("getAdminId: no admin id found in req.user. Keys present:", Object.keys(user));
+  return null;
 }
 
 async function logAudit({ adminId = null, type = DEFAULT_ACTION_TYPE, description }) {
