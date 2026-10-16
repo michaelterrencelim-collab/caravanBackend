@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
+const crypto = require("crypto");
 const { checkAuth } = require("../../imports/token");
 const db = require("../../imports/database");
 
@@ -27,6 +28,20 @@ async function generateAccessToken() {
     return response.data.access_token;
 }
 
+function paymentApiError(error, operation) {
+    const details = error.response?.data?.details || [];
+    const detailMessage = details
+        .map(detail => [detail.issue, detail.description].filter(Boolean).join(": "))
+        .filter(Boolean)
+        .join("; ");
+    const message = detailMessage || error.response?.data?.message || error.message;
+    const debugId = error.response?.data?.debug_id;
+    const wrapped = new Error(`${operation} failed${message ? `: ${message}` : ""}${debugId ? ` (PayPal debug ID: ${debugId})` : ""}`);
+    wrapped.issue = details.find(detail => detail.issue)?.issue;
+    wrapped.statusCode = 402;
+    return wrapped;
+}
+
 router.get("/config", async (req, res) => {
     if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_API) {
         return res.status(503).json({ error: "PayPal is not configured" });
@@ -42,7 +57,12 @@ router.get("/config", async (req, res) => {
         console.error("PayPal configuration lookup failed:", error.message);
         return res.status(503).json({ error: "Unable to verify PayPal payment configuration" });
     }
-    return res.json({ clientId: process.env.PAYPAL_CLIENT_ID });
+    return res.json({
+        clientId: process.env.PAYPAL_CLIENT_ID,
+        merchantId: process.env.PAYPAL_MERCHANT_ID || "",
+        environment: process.env.PAYPAL_ENVIRONMENT ||
+            (String(process.env.PAYPAL_API).includes("sandbox") ? "sandbox" : "live")
+    });
 });
 
 router.post("/create-order", checkAuth("user"), async (req, res) => {
@@ -137,15 +157,19 @@ async function captureOrder(orderId, customerId, expectedTotal) {
 
     const accessToken = await generateAccessToken();
     const headers = { Authorization: `Bearer ${accessToken}` };
-    const orderResponse = await axios.get(
-        `${process.env.PAYPAL_API.replace(/\/$/, "")}/v2/checkout/orders/${encodeURIComponent(orderId)}`,
-        { headers }
-    );
+    let orderResponse;
+    try {
+        orderResponse = await axios.get(
+            `${process.env.PAYPAL_API.replace(/\/$/, "")}/v2/checkout/orders/${encodeURIComponent(orderId)}`,
+            { headers }
+        );
+    } catch (error) {
+        throw paymentApiError(error, "PayPal order verification");
+    }
     const approvedOrder = orderResponse.data;
     const approvedUnit = approvedOrder.purchase_units?.[0];
     const approvedAmount = Number(approvedUnit?.amount?.value);
     if (
-        approvedOrder.status !== "APPROVED" ||
         String(approvedUnit?.custom_id) !== String(customerId) ||
         approvedUnit?.amount?.currency_code !== "PHP" ||
         !Number.isFinite(approvedAmount) ||
@@ -154,11 +178,37 @@ async function captureOrder(orderId, customerId, expectedTotal) {
         throw new Error("PayPal approval does not match this checkout");
     }
 
-    const response = await axios.post(
-        `${process.env.PAYPAL_API.replace(/\/$/, "")}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
-        {},
-        { headers }
-    );
+    // A capture may have succeeded even if the original response was lost.
+    // Treat a verified completed capture as success so a retry cannot strand a paid order.
+    if (approvedOrder.status === "COMPLETED") {
+        const existingCapture = approvedUnit?.payments?.captures?.[0];
+        const capturedAmount = Number(existingCapture?.amount?.value);
+        if (
+            existingCapture?.status === "COMPLETED" &&
+            existingCapture?.amount?.currency_code === "PHP" &&
+            capturedAmount === Number(Number(expectedTotal).toFixed(2))
+        ) {
+            return { orderId: approvedOrder.id, captureId: existingCapture.id, amount: capturedAmount };
+        }
+        throw new Error("PayPal order is already completed, but its capture could not be verified");
+    }
+    if (approvedOrder.status !== "APPROVED") {
+        throw new Error(`PayPal order is not approved (current status: ${approvedOrder.status || "unknown"})`);
+    }
+
+    let response;
+    try {
+        // A buyer may retry after changing funding sources. Give each capture
+        // attempt a fresh idempotency key; completed orders are verified above.
+        const requestId = `capture-${crypto.randomBytes(15).toString("hex")}`;
+        response = await axios.post(
+            `${process.env.PAYPAL_API.replace(/\/$/, "")}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
+            {},
+            { headers: { ...headers, "PayPal-Request-Id": requestId } }
+        );
+    } catch (error) {
+        throw paymentApiError(error, "PayPal capture");
+    }
 
     const order = response.data;
     const purchaseUnit = order.purchase_units?.[0];

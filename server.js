@@ -8,6 +8,33 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(cookieParser());
+
+const allowedOrigins = new Set([
+  "http://localhost",
+  "http://localhost:8100",
+  "https://localhost",
+  "capacitor://localhost",
+  ...(process.env.CORS_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean),
+]);
+
+app.use((req, res, next) => {
+  const origin = req.get("Origin");
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Vary", "Origin");
+  }
+
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
+
+app.get("/healthz", (_req, res) => {
+  res.json({ ok: true });
+});
+
 const routersPath = path.join(__dirname, "routes");
 
 // Recursively load routes
@@ -52,6 +79,6 @@ app.use((req, res) => {
 });
 module.exports = app;
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });

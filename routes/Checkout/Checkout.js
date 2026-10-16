@@ -322,7 +322,9 @@ router.post("/", checkAuth("user"), async (req, res) => {
                 );
             } catch (paymentError) {
                 console.error("PayPal capture error:", paymentError.response?.data || paymentError.message);
-                throw new Error(paymentError.message || "PayPal payment could not be captured");
+                const checkoutError = new Error(paymentError.message || "PayPal payment could not be captured");
+                checkoutError.statusCode = paymentError.statusCode || 402;
+                throw checkoutError;
             }
         }
 
@@ -451,7 +453,10 @@ router.post("/", checkAuth("user"), async (req, res) => {
                 discount: Number(discount.toFixed(2)),
                 shippingName,
                 shippingFee: Number(shippingFee.toFixed(2)),
-                totalCost: Number(totalCost.toFixed(2))
+                totalCost: Number(totalCost.toFixed(2)),
+                paymentMethod: normalizedPaymentType === "paypal"
+                    ? "Online Payment (PayPal)"
+                    : "Cash on Delivery"
             });
 
             confirmationEmailSent = true;
@@ -470,6 +475,8 @@ router.post("/", checkAuth("user"), async (req, res) => {
                 : "Order placed successfully, but the confirmation email could not be sent.",
 
             orderId,
+            customerEmail,
+            paymentType: normalizedPaymentType,
             emailSent: confirmationEmailSent,
             shippingId: validatedShippingId,
             shippingFee: Number(shippingFee.toFixed(2)),
@@ -488,7 +495,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
 
         console.error("Checkout error:", error);
 
-        return res.status(500).json({
+        return res.status(error.statusCode || 500).json({
             success: false,
             error: 
                 error.message || "Checkout failed"

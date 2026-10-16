@@ -22,7 +22,8 @@ async function sendOrderConfirmation({
     discount,
     shippingName,
     shippingFee,
-    totalCost
+    totalCost,
+    paymentMethod
 }) {
     const itemRows = items.map(item => `
         <tr>
@@ -132,6 +133,11 @@ async function sendOrderConfirmation({
                     <div>
                         Discount:
                         -₱${Number(discount).toFixed(2)}
+                    </div>
+
+                    <div>
+                        Payment method:
+                        ${escapeHTML(paymentMethod || "Cash on Delivery")}
                     </div>
 
                     <div style="
