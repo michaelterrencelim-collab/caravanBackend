@@ -30,6 +30,8 @@ app.get("/fetchProducts", async (req, res) => {
           p.Prod_amount,
           p.Prod_img,
           p."desc",
+          COALESCE(review_summary.average_rating, 0) AS product_rating,
+          COALESCE(review_summary.review_count, 0) AS review_count,
 
           c.country_id,
           c.country_name,
@@ -50,6 +52,16 @@ app.get("/fetchProducts", async (req, res) => {
 
         LEFT JOIN Type t
             ON p.type_id = t.type_id
+
+        LEFT JOIN (
+          SELECT
+            product_id,
+            ROUND(AVG(rating), 1) AS average_rating,
+            COUNT(*) AS review_count
+          FROM Review
+          GROUP BY product_id
+        ) review_summary
+          ON review_summary.product_id = p.product_id
 
         ${whereClause}
 
@@ -73,6 +85,8 @@ app.get("/fetchProducts", async (req, res) => {
           product_price: row.Prod_price,
           product_amount: row.Prod_amount,
           product_likes: row.Prod_likes,
+          product_rating: Number(row.product_rating) || 0,
+          review_count: Number(row.review_count) || 0,
           product_desc: row.desc,
           product_category: [],
           product_country: row.country_name,
