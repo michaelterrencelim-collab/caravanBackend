@@ -6,6 +6,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const ordersBody = document.getElementById("ordersBody");
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 
+  const signOutDialog = document.createElement("dialog");
+  signOutDialog.className = "signout-dialog";
+  signOutDialog.setAttribute("aria-labelledby", "signOutDialogTitle");
+  signOutDialog.setAttribute("aria-describedby", "signOutDialogMessage");
+  signOutDialog.innerHTML = `
+    <div class="signout-dialog__content">
+      <span class="signout-dialog__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M16 16l4-4-4-4m4 4H9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <h2 id="signOutDialogTitle">Sign out?</h2>
+      <p id="signOutDialogMessage">Are you sure you want to sign out of your account?</p>
+      <div class="signout-dialog__actions">
+        <button class="signout-dialog__cancel" type="button" data-signout-cancel>Cancel</button>
+        <button class="signout-dialog__confirm" type="button" data-signout-confirm>Sign Out</button>
+      </div>
+    </div>`;
+  document.body.append(signOutDialog);
+  const cancelSignOut = signOutDialog.querySelector("[data-signout-cancel]");
+  const confirmSignOut = signOutDialog.querySelector("[data-signout-confirm]");
+
   if (bellDot) bellDot.classList.add("show");
   const currentPage = location.pathname.split("/").pop() || "dashboard";
   navLinks.forEach((link) => link.classList.toggle("is-active", link.getAttribute("href") === `/admin/${currentPage}`));
@@ -21,9 +41,20 @@ document.addEventListener("DOMContentLoaded", () => {
     event.preventDefault();
     location.href = "/admin/ordersReports";
   }));
-  if (signOutBtn) signOutBtn.addEventListener("click", () => {
-    if (confirm("Are you sure you want to sign out?")) console.log("Signed out");
-  });
+  if (signOutBtn) {
+    signOutBtn.setAttribute("aria-haspopup", "dialog");
+    signOutBtn.addEventListener("click", () => signOutDialog.showModal());
+    cancelSignOut.addEventListener("click", () => signOutDialog.close());
+    confirmSignOut.addEventListener("click", () => {
+      confirmSignOut.disabled = true;
+      confirmSignOut.textContent = "Signing out…";
+      window.location.assign("/login");
+    });
+    signOutDialog.addEventListener("click", (event) => {
+      if (event.target === signOutDialog) signOutDialog.close();
+    });
+    signOutDialog.addEventListener("close", () => signOutBtn.focus());
+  }
 
   if (ordersBody) loadRecentOrders();
 

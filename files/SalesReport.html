@@ -90,7 +90,7 @@
       <header class="panel-header">
         <div>
           <h1 id="pageTitle">Sales Reports</h1>
-          <p class="subtitle" id="pageSubtitle">Product performances by each period</p>
+          <p class="subtitle" id="pageSubtitle">Product and bundle performance by category</p>
         </div>
         <button class="notifs" id="bellBtn" type="button" aria-label="Notifications">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 3.5a5.5 5.5 0 0 0-5.5 5.5v3.1c0 .6-.2 1.1-.6 1.6L4.6 15c-.7.8-.1 2 .9 2h13c1 0 1.6-1.2.9-2l-1.3-1.3a2.2 2.2 0 0 1-.6-1.6V9A5.5 5.5 0 0 0 12 3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -103,25 +103,14 @@
         <div class="toolbar" id="salesToolbar">
           <div class="search-field">
             <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.7"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-            <input type="text" id="productSearchInput" placeholder="Search for a product">
+            <input type="search" id="productSearchInput" placeholder="Search products by ID, name, or category" aria-label="Search products by ID, name, or category">
           </div>
-          <button class="btn" id="addReportBtn" type="button">
-            <span>Add a new report</span>
-            <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          </button>
           <div class="filter-wrap">
             <button class="btn" id="categoryFilterBtn" type="button" aria-haspopup="true" aria-expanded="false">
               <span>Category Filter</span>
               <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
             </button>
-            <div class="filter-menu" id="categoryFilterMenu">
-              <button type="button" data-category="all" class="is-active">All Categories</button>
-              <button type="button" data-category="middle-east">Middle East</button>
-              <button type="button" data-category="sea">SEA</button>
-              <button type="button" data-category="south-asia">South Asia</button>
-              <button type="button" data-category="europe">Europe</button>
-              <button type="button" data-category="east-asia">East Asia</button>
-            </div>
+            <div class="filter-menu" id="categoryFilterMenu" role="group" aria-label="Filter by category"></div>
           </div>
           <button class="btn export-btn" id="exportBtn" type="button">
             <span>Export</span>
@@ -129,75 +118,28 @@
           </button>
         </div>
 
-        <div class="products-card">
-          <table class="products-table">
+        <div class="products-card sales-card">
+          <div class="sales-table-scroll" tabindex="0" aria-label="Sales report products">
+          <table class="products-table sales-table">
             <thead>
               <tr>
                 <th>Product ID</th>
                 <th>Product Name</th>
-                <th>Category</th>
+                <th>Categories</th>
                 <th>Sold</th>
                 <th>Revenue</th>
-                <th>Net Gain</th>
               </tr>
             </thead>
             <tbody id="salesBody">
-              <tr data-category="sea">
-                <td class="mono">#XXXXXXXX</td>
-                <td>Temporary Name</td>
-                <td><span class="tag tag-sea">SEA</span></td>
-                <td class="mono">XXX</td>
-                <td class="mono">₱XXXXXX</td>
-                <td><span class="gain gain-up"><svg viewBox="0 0 24 24" fill="none"><path d="M5 17 12 7l7 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>XX.XX%</span></td>
-              </tr>
-              <tr data-category="sea">
-                <td class="mono">#XXXXXXXX</td>
-                <td>Temporary Name</td>
-                <td><span class="tag tag-sea">SEA</span></td>
-                <td class="mono">XXX</td>
-                <td class="mono">₱XXXXXX</td>
-                <td><span class="gain gain-up"><svg viewBox="0 0 24 24" fill="none"><path d="M5 17 12 7l7 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>XX.XX%</span></td>
-              </tr>
-              <tr data-category="sea">
-                <td class="mono">#XXXXXXXX</td>
-                <td>Temporary Name</td>
-                <td><span class="tag tag-sea">SEA</span></td>
-                <td class="mono">XXX</td>
-                <td class="mono">₱XXXXXX</td>
-                <td><span class="gain gain-down"><svg viewBox="0 0 24 24" fill="none"><path d="M5 7 12 17l7-10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>XX.XX%</span></td>
-              </tr>
-              <tr data-category="sea">
-                <td class="mono">#XXXXXXXX</td>
-                <td>Temporary Name</td>
-                <td><span class="tag tag-sea">SEA</span></td>
-                <td class="mono">XXX</td>
-                <td class="mono">₱XXXXXX</td>
-                <td><span class="gain gain-up"><svg viewBox="0 0 24 24" fill="none"><path d="M5 17 12 7l7 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>XX.XX%</span></td>
-              </tr>
-              <tr data-category="sea">
-                <td class="mono">#XXXXXXXX</td>
-                <td>Temporary Name</td>
-                <td><span class="tag tag-sea">SEA</span></td>
-                <td class="mono">XXX</td>
-                <td class="mono">₱XXXXXX</td>
-                <td><span class="gain gain-up"><svg viewBox="0 0 24 24" fill="none"><path d="M5 17 12 7l7 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>XX.XX%</span></td>
-              </tr>
-              <tr data-category="sea">
-                <td class="mono">#XXXXXXXX</td>
-                <td>Temporary Name</td>
-                <td><span class="tag tag-sea">SEA</span></td>
-                <td class="mono">XXX</td>
-                <td class="mono">₱XXXXXX</td>
-                <td><span class="gain gain-down"><svg viewBox="0 0 24 24" fill="none"><path d="M5 7 12 17l7-10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>XX.XX%</span></td>
-              </tr>
             </tbody>
           </table>
+          </div>
 
-          <div class="table-footer">
-            <span>1 out of X pages</span>
+          <div class="table-footer sales-footer">
+            <span id="salesPageIndicator" aria-live="polite">Page 1 of 1 · 0 products</span>
             <div class="page-arrows">
-              <button type="button" aria-label="Previous page"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-              <button type="button" aria-label="Next page"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <button id="prevSalesPageBtn" type="button" aria-label="Previous page" disabled><svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <button id="nextSalesPageBtn" type="button" aria-label="Next page" disabled><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             </div>
           </div>
         </div>

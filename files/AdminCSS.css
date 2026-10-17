@@ -123,6 +123,49 @@ button { font-family: inherit; cursor: pointer; }
 
 .signout:hover { background: rgba(217, 83, 79, 0.1); }
 
+.signout-dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid #49372a;
+  border-radius: 16px;
+  background: #1c1712;
+  color: var(--text-primary);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.signout-dialog::backdrop { background: rgba(8, 6, 4, 0.72); backdrop-filter: blur(3px); }
+.signout-dialog__content { padding: 28px; text-align: center; }
+.signout-dialog__icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(217, 83, 79, 0.35);
+  border-radius: 50%;
+  background: rgba(217, 83, 79, 0.1);
+  color: var(--red);
+}
+.signout-dialog__icon svg { width: 23px; height: 23px; }
+.signout-dialog h2 { margin: 0 0 8px; font-size: 1.2rem; }
+.signout-dialog p { margin: 0; color: var(--text-secondary); font-size: 0.94rem; line-height: 1.5; }
+.signout-dialog__actions { display: flex; gap: 10px; margin-top: 24px; }
+.signout-dialog__actions button {
+  flex: 1;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.signout-dialog__cancel { background: transparent; color: var(--text-primary); }
+.signout-dialog__cancel:hover { background: rgba(255, 255, 255, 0.06); }
+.signout-dialog__confirm { border-color: var(--red) !important; background: var(--red); color: #fff; }
+.signout-dialog__confirm:hover { background: #c24743; }
+.signout-dialog__confirm:disabled { cursor: wait; opacity: 0.75; }
+
 .content { flex: 1; padding: 28px; display: flex; }
 
 .panel {

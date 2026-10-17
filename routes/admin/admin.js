@@ -279,9 +279,56 @@ router.get("/orders", async (req, res) => {
 router.get("/sales", async (_req, res) => {
   try {
     const result = await db.execute({
-      sql: `SELECT p.product_id, p.Prod_name, SUM(oi.Quantity) AS units_sold, SUM(oi.Quantity * oi.Unit_price) AS sales_total FROM Order_items oi JOIN Orders o ON o.Order_id = oi.Order_id JOIN Product p ON p.product_id = oi.Product_id GROUP BY p.product_id, p.Prod_name ORDER BY sales_total DESC`,
+      sql: `SELECT p.product_id, p.Prod_name, t.type_name,
+                   COALESCE(s.units_sold, 0) AS units_sold,
+                   COALESCE(s.revenue, 0) AS revenue,
+                   c.category_id, c.category_name
+            FROM Product p
+            LEFT JOIN Type t ON t.type_id = p.type_id
+            LEFT JOIN (
+              SELECT oi.Product_id,
+                     SUM(oi.Quantity) AS units_sold,
+                     SUM(oi.Quantity * oi.Unit_price) AS revenue
+              FROM Order_items oi
+              JOIN Orders o ON o.Order_id = oi.Order_id
+              LEFT JOIN Order_status os ON os.Status_id = o.Status_id
+              WHERE LOWER(COALESCE(os.Order_status, '')) NOT LIKE '%cancel%'
+                AND LOWER(COALESCE(os.Order_status, '')) NOT LIKE '%refund%'
+                AND LOWER(COALESCE(os.Order_status, '')) NOT LIKE '%return%'
+              GROUP BY oi.Product_id
+            ) s ON s.Product_id = p.product_id
+            LEFT JOIN Product_categories pc ON pc.product_id = p.product_id
+            LEFT JOIN Categories c ON c.category_id = pc.category_id
+            ORDER BY p.product_id, c.category_name`,
     });
-    res.json(result.rows);
+
+    const products = new Map();
+    const categories = new Map();
+    for (const row of result.rows) {
+      const productId = Number(row.product_id);
+      if (!products.has(productId)) {
+        products.set(productId, {
+          product_id: productId,
+          product_name: row.Prod_name,
+          type_name: row.type_name || null,
+          units_sold: Number(row.units_sold || 0),
+          revenue: Number(row.revenue || 0),
+          categories: [],
+        });
+      }
+      if (row.category_id != null && row.category_name != null) {
+        const product = products.get(productId);
+        if (!product.categories.some((category) => category.category_id === Number(row.category_id))) {
+          product.categories.push({ category_id: Number(row.category_id), category_name: row.category_name });
+        }
+        categories.set(Number(row.category_id), row.category_name);
+      }
+    }
+
+    res.json({
+      products: [...products.values()],
+      categories: [...categories].map(([category_id, category_name]) => ({ category_id, category_name })),
+    });
   } catch (error) {
     fail(res, error, "Unable to retrieve sales report");
   }
