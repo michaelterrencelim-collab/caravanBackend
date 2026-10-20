@@ -1,133 +1,151 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const tabs = document.querySelectorAll(".tab");
-  const contentBody = document.getElementById("contentBody");
-  const addContentBtn = document.getElementById("addContentBtn");
-  const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  const editorList = document.getElementById("contentEditorList");
+  const count = document.getElementById("contentCount");
+  const dialog = document.getElementById("contentConfirmDialog");
+  const confirmSaveButton = document.getElementById("confirmContentSave");
+  let pendingSave = null;
   let contentRows = [];
-  let activeFilter = "all";
-
-  tabs.forEach((tab) => tab.addEventListener("click", () => {
-    tabs.forEach((item) => item.classList.toggle("is-active", item === tab));
-    activeFilter = tab.dataset.filter;
-    applyFilter();
-  }));
 
   loadContent();
 
   async function request(url, options = {}) {
     const response = await fetch(url, { credentials: "same-origin", ...options });
-    if (response.status === 204) return null;
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Request failed");
+    const data = response.status === 204 ? null : await response.json();
+    if (!response.ok) throw new Error(data?.error || "Request failed");
     return data;
   }
 
   async function loadContent() {
-    contentBody.innerHTML = '<tr><td colspan="6">Loading content…</td></tr>';
+    editorList.innerHTML = '<div class="content-state">Loading content…</div>';
     try {
       contentRows = await request("/api/admin/content") || [];
+      contentRows.sort((a, b) => Number(a.content_type_id) - Number(b.content_type_id));
       renderContent();
     } catch (error) {
-      contentBody.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message)}. Please refresh to try again.</td></tr>`;
+      count.textContent = "";
+      editorList.innerHTML = `<div class="content-state content-state-error">${escapeHtml(error.message)}. Please refresh to try again.</div>`;
     }
   }
 
-  function typeLabel(row) {
-    return row.content_type_name || `Type ${row.content_type_id}`;
-  }
-  function typeFilter(row) {
-    const value = typeLabel(row).toLowerCase();
-    if (value.includes("banner")) return "banner";
-    if (value.includes("promotion")) return "promotion";
-    if (value.includes("faq")) return "faq";
-    if (value.includes("page")) return "page";
-    return value.replace(/[^a-z0-9-]/g, "-");
-  }
   function renderContent() {
+    count.textContent = `${contentRows.length} section${contentRows.length === 1 ? "" : "s"}`;
     if (!contentRows.length) {
-      contentBody.innerHTML = '<tr><td colspan="6">No content found.</td></tr>';
+      editorList.innerHTML = '<div class="content-state">No website content was found.</div>';
       return;
     }
-    contentBody.innerHTML = contentRows.map((row) => {
-      const status = String(row.content_status || "Draft");
-      const published = status.toLowerCase() === "published";
-      const typeId = Number(row.content_type_id);
-      const edited = row.Last_edited ? new Date(row.Last_edited).toLocaleDateString() : "—";
-      return `<tr data-id="${escapeHtml(row.content_id)}" data-type="${escapeHtml(typeFilter(row))}" data-content-type-id="${escapeHtml(typeId)}">
-        <td><span class="cm-preview" aria-hidden="true"></span></td>
-        <td>${escapeHtml(row.title)}</td><td>${escapeHtml(typeLabel(row))}</td><td class="mono">${escapeHtml(edited)}</td>
-        <td><span class="status-pill status-${published ? "published" : "unpublished"}">${escapeHtml(status)}</span></td>
-        <td><div class="cm-actions"><div class="cm-actions-col"><a href="#" data-action="view">View</a><a href="#" data-action="edit">Edit</a></div><div class="cm-actions-col"><a href="#" data-action="${published ? "unpublish" : "publish"}">${published ? "Unpublish" : "Publish"}</a><a href="#" data-action="delete">Delete</a></div></div></td>
-      </tr>`;
-    }).join("");
-    applyFilter();
-  }
-  function applyFilter() {
-    contentBody.querySelectorAll("tr[data-id]").forEach((row) => {
-      row.style.display = activeFilter === "all" || row.dataset.type === activeFilter ? "" : "none";
-    });
+
+    editorList.innerHTML = contentRows.map((row) => `
+      <article class="content-editor-card" data-id="${escapeHtml(row.content_id)}">
+        <div class="content-editor-heading">
+          <div>
+            <h3>${escapeHtml(row.content_type_name || `Content ${row.content_type_id}`)}</h3>
+            <span class="content-editor-id">Content #${escapeHtml(row.content_id)}</span>
+          </div>
+          <div class="content-editor-tools">
+            <span class="content-last-edited">Last edited <time>${escapeHtml(formatDate(row.update_date))}</time></span>
+            <button class="btn btn-secondary content-edit-button" type="button" data-action="edit">Edit</button>
+            <button class="btn btn-secondary content-cancel-button" type="button" data-action="cancel" hidden>Cancel</button>
+          </div>
+        </div>
+        <label class="sr-only" for="content-text-${escapeHtml(row.content_id)}">${escapeHtml(row.content_type_name || "Content")} text</label>
+        <textarea class="content-editor-textarea" id="content-text-${escapeHtml(row.content_id)}" data-content="${escapeHtml(row.content_id)}" disabled>${escapeHtml(row.Main_text || "")}</textarea>
+        <p class="content-save-status" role="status" aria-live="polite"></p>
+      </article>
+    `).join("");
   }
 
-  contentBody.addEventListener("click", async (event) => {
-    const link = event.target.closest("[data-action]");
-    if (!link) return;
-    event.preventDefault();
-    const row = link.closest("tr");
-    const record = contentRows.find((item) => String(item.content_id) === row.dataset.id);
-    if (!record) return;
-    const action = link.dataset.action;
-    try {
-      if (action === "view") {
-        alert(`${record.title}\n${typeLabel(record)} · ${record.content_status || "Draft"}`);
-      } else if (action === "edit") {
-        const title = prompt("Content title:", record.title);
-        if (title === null) return;
-        if (!title.trim()) { alert("A title is required."); return; }
-        const typeId = prompt("Content type ID:", String(record.content_type_id));
-        if (typeId === null) return;
-        if (!Number.isInteger(Number(typeId)) || Number(typeId) < 1) { alert("Enter a valid content type ID."); return; }
-        const updated = await request(`/api/admin/content/${encodeURIComponent(record.content_id)}`, {
-          method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: title.trim(), contentTypeId: Number(typeId), status: record.content_status || "Draft" }),
-        });
-        Object.assign(record, { title: updated.title, content_type_id: Number(typeId), content_status: updated.status });
-        await loadContent();
-      } else if (action === "publish" || action === "unpublish") {
-        const status = action === "publish" ? "Published" : "Unpublished";
-        const updated = await request(`/api/admin/content/${encodeURIComponent(record.content_id)}`, {
-          method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: record.title, contentTypeId: Number(record.content_type_id), status }),
-        });
-        record.content_status = updated.status;
-        await loadContent();
-      } else if (action === "delete") {
-        if (!confirm(`Delete “${record.title}”? This cannot be undone.`)) return;
-        await request(`/api/admin/content/${encodeURIComponent(record.content_id)}`, { method: "DELETE" });
-        contentRows = contentRows.filter((item) => String(item.content_id) !== String(record.content_id));
-        renderContent();
+  editorList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const card = button.closest(".content-editor-card");
+    const row = contentRows.find((item) => String(item.content_id) === card.dataset.id);
+    const textarea = card.querySelector("textarea");
+    const editButton = card.querySelector('[data-action="edit"]');
+    const cancelButton = card.querySelector('[data-action="cancel"]');
+    const status = card.querySelector(".content-save-status");
+
+    if (button.dataset.action === "edit") {
+      if (textarea.disabled) {
+        textarea.dataset.original = textarea.value;
+        textarea.disabled = false;
+        textarea.focus();
+        editButton.textContent = "Save";
+        editButton.classList.add("is-save");
+        editButton.disabled = true;
+        cancelButton.hidden = false;
+        status.textContent = "Editing unsaved changes";
+      } else {
+        pendingSave = { card, row, textarea, editButton, cancelButton, status };
+        document.getElementById("contentConfirmMessage").textContent = `Save changes to ${row.content_type_name}? This will update the website and add an audit entry.`;
+        dialog.showModal();
       }
-    } catch (error) {
-      alert(error.message);
+    }
+
+    if (button.dataset.action === "cancel") {
+      textarea.value = textarea.dataset.original ?? textarea.value;
+      textarea.disabled = true;
+      editButton.textContent = "Edit";
+      editButton.classList.remove("is-save");
+      cancelButton.hidden = true;
+      status.textContent = "Changes discarded";
     }
   });
 
-  if (addContentBtn) addContentBtn.addEventListener("click", async () => {
-    const title = prompt("Content title:");
-    if (title === null) return;
-    if (!title.trim()) { alert("A title is required."); return; }
-    const knownTypes = [...new Map(contentRows.map((row) => [Number(row.content_type_id), typeLabel(row)])).entries()];
-    const typeHelp = knownTypes.length ? `Available types: ${knownTypes.map(([id, label]) => `${label} (${id})`).join(", ")}` : "Enter a content type ID.";
-    const typeId = prompt(`${typeHelp}\nContent type ID:`, knownTypes.length === 1 ? String(knownTypes[0][0]) : "");
-    if (typeId === null) return;
-    if (!Number.isInteger(Number(typeId)) || Number(typeId) < 1) { alert("Enter a valid content type ID."); return; }
+  editorList.addEventListener("input", (event) => {
+    const textarea = event.target.closest(".content-editor-textarea");
+    if (!textarea || textarea.disabled) return;
+    const card = textarea.closest(".content-editor-card");
+    const saveButton = card.querySelector('[data-action="edit"]');
+    saveButton.disabled = textarea.value === textarea.dataset.original;
+    card.querySelector(".content-save-status").textContent = saveButton.disabled
+      ? "No changes to save"
+      : "Unsaved changes";
+  });
+
+  dialog.addEventListener("close", async () => {
+    if (dialog.returnValue !== "save" || !pendingSave) {
+      pendingSave = null;
+      return;
+    }
+    const target = pendingSave;
+    const updatedText = target.textarea.value;
+    confirmSaveButton.disabled = true;
+    target.editButton.disabled = true;
+    target.cancelButton.disabled = true;
+    target.status.textContent = "Saving…";
     try {
-      await request("/api/admin/content", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), contentTypeId: Number(typeId), status: "Draft" }),
+      const updated = await request(`/api/admin/content/${encodeURIComponent(target.row.content_id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mainText: updatedText }),
       });
-      await loadContent();
+      target.row.Main_text = updated.Main_text;
+      target.row.update_date = updated.update_date;
+      target.textarea.value = updated.Main_text ?? updatedText;
+      target.textarea.disabled = true;
+      target.editButton.textContent = "Edit";
+      target.editButton.classList.remove("is-save");
+      target.cancelButton.hidden = true;
+      target.status.textContent = "Saved and added to the audit trail";
+      target.card.querySelector(".content-last-edited time").textContent = formatDate(updated.update_date);
     } catch (error) {
-      alert(error.message);
+      target.status.textContent = `Could not save: ${error.message}`;
+    } finally {
+      target.editButton.disabled = false;
+      target.cancelButton.disabled = false;
+      confirmSaveButton.disabled = false;
+      pendingSave = null;
     }
   });
+
+  function formatDate(value) {
+    if (!value) return "Not yet recorded";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  }
 });

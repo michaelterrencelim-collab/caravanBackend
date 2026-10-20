@@ -6,11 +6,8 @@ app.customPath = "/";
 
 const filesPath = path.join(__dirname, "../../files");
 
-app.use(express.static(filesPath));
-
 app.get("/", (req, res) => {
-  console.log("Route hit: /");
-  res.sendFile(path.join(filesPath, "index.html"));
+  res.redirect("/login");
 });
 
 app.get("/login", (req, res) => {
@@ -20,25 +17,19 @@ app.get("/login", (req, res) => {
 });
 
 app.get("/register", (req, res) => {
-  console.log("Route hit: /registerPage");
-  res.clearCookie("auth");
-  res.sendFile(path.join(filesPath, "RegisterPage.html"));
+  res.redirect("/login");
 });
 
 app.get("/faqs", (req, res) => {
-  console.log("Route hit: /faqs");
-  res.sendFile(path.join(filesPath, "FAQs.html"));
+  res.redirect("/login");
 });
 
 app.get("/store", (req, res) => {
-  console.log("Route hit: /store");
-  res.sendFile(path.join(filesPath, "storepage.html"));
+  res.redirect("/login");
 });
 
 app.get("/product", (req, res) => {
-  console.log("Route hit: /product");
-
-  res.sendFile(path.join(filesPath, "productpage.html"));
+  res.redirect("/login");
 });
 
 module.exports = app;

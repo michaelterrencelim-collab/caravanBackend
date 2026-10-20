@@ -84,32 +84,23 @@ loginForm.addEventListener("submit", async function (e) {
   loginButton.textContent = "LOADING...";
   loginButton.style.backdropFilter = "blur(25px)";
 
-  //now call api /api/login
-  const response = await fetch("/api/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  const data = await response.json();
-
-  if (data.error) {
-    showError(data.error);
-
-    loginButton.disabled = false;
-    loginButton.textContent = "SIGN IN";
-    loginButton.style.backdropFilter = "blur(0px)";
-    return;
-  } else {
-    if (data.role == "admin") {
-      window.location.href = "/admin/dashboard";
-    } else {
-      window.location.href = "/store";
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      showError(data.error || "Invalid email or password");
+      return;
     }
+    if (data.role !== "admin") {
+      showError("Invalid email or password");
+      return;
+    }
+    window.location.href = "/admin/dashboard";
+  } catch (error) {
+    showError("Unable to sign in right now. Please try again.");
   }
-  // Loading state
-
-  // Successful login simulation
 });

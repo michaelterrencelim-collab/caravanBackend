@@ -267,7 +267,7 @@ router.put("/accounts/:kind/:accountId/status", async (req, res) => {
 router.get("/content", async (_req, res) => {
   try {
     const result = await db.execute({
-      sql: `SELECT c.content_id, c.Admin_id, c.title, c.content_type_id, ct.content_type_name, c.content_status, c.Last_edited FROM Content c LEFT JOIN Content_type ct ON ct.content_type_id = c.content_type_id ORDER BY c.content_id`,
+      sql: `SELECT c.content_id, c.Main_text, c.update_date, c.content_type_id, ct.content_type_name FROM Content c LEFT JOIN Content_type ct ON ct.content_type_id = c.content_type_id ORDER BY c.content_type_id`,
     });
     res.json(result.rows);
   } catch (error) {
@@ -275,77 +275,33 @@ router.get("/content", async (_req, res) => {
   }
 });
 
-router.post("/content", async (req, res) => {
-  const { title, contentTypeId, status = "Draft" } = req.body;
-  if (!title?.trim() || !Number.isInteger(Number(contentTypeId)))
-    return res
-      .status(400)
-      .json({ error: "title and contentTypeId are required" });
-  try {
-    const result = await db.execute({
-      sql: "INSERT INTO Content (content_id, Admin_id, title, content_type_id, content_status, Last_edited) SELECT COALESCE(MAX(content_id), 0) + 1, ?, ?, ?, ?, CURRENT_TIMESTAMP FROM Content RETURNING content_id",
-      args: [req.user.adminId, title.trim(), Number(contentTypeId), status],
-    });
-    res
-      .status(201)
-      .json({
-        contentId: Number(result.rows[0].content_id),
-        title: title.trim(),
-        status,
-      });
-  } catch (error) {
-    fail(res, error, "Unable to create content");
-  }
-});
-
 router.put("/content/:contentId", async (req, res) => {
   const id = Number(req.params.contentId);
-  const { title, contentTypeId, status } = req.body;
-  if (
-    !Number.isInteger(id) ||
-    id < 1 ||
-    !title?.trim() ||
-    !Number.isInteger(Number(contentTypeId)) ||
-    !status?.trim()
-  )
+  const { mainText } = req.body;
+  if (!Number.isInteger(id) || id < 1 || typeof mainText !== "string")
     return res
       .status(400)
-      .json({
-        error: "contentId, title, contentTypeId, and status are required",
-      });
+      .json({ error: "contentId and mainText are required" });
   try {
     const result = await db.execute({
-      sql: "UPDATE Content SET title = ?, content_type_id = ?, content_status = ?, Admin_id = ?, Last_edited = CURRENT_TIMESTAMP WHERE content_id = ?",
-      args: [
-        title.trim(),
-        Number(contentTypeId),
-        status.trim(),
-        req.user.adminId,
-        id,
-      ],
+      sql: "UPDATE Content SET Main_text = ?, update_date = CURRENT_TIMESTAMP WHERE content_id = ?",
+      args: [mainText, id],
     });
     if (!result.rowsAffected)
       return res.status(404).json({ error: "Content not found" });
-    res.json({ contentId: id, title: title.trim(), status: status.trim() });
-  } catch (error) {
-    fail(res, error, "Unable to update content");
-  }
-});
-
-router.delete("/content/:contentId", async (req, res) => {
-  const id = Number(req.params.contentId);
-  if (!Number.isInteger(id) || id < 1)
-    return res.status(400).json({ error: "Invalid contentId" });
-  try {
-    const result = await db.execute({
-      sql: "DELETE FROM Content WHERE content_id = ?",
+    const updated = await db.execute({
+      sql: `SELECT c.content_id, c.Main_text, c.update_date, c.content_type_id, ct.content_type_name FROM Content c LEFT JOIN Content_type ct ON ct.content_type_id = c.content_type_id WHERE c.content_id = ?`,
       args: [id],
     });
-    if (!result.rowsAffected)
-      return res.status(404).json({ error: "Content not found" });
-    res.status(204).end();
+    const row = updated.rows[0];
+    await logAudit({
+      adminId: req.user.adminId,
+      type: "content_update",
+      description: `Updated ${row?.content_type_name || "website content"} text (Content #${id})`,
+    });
+    res.json(row);
   } catch (error) {
-    fail(res, error, "Unable to delete content");
+    fail(res, error, "Unable to update content");
   }
 });
 

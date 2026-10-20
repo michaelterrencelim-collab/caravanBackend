@@ -46,6 +46,24 @@ body {
 
 .navbar {
   background-color: #6F4E37;
+  min-height: 96px;
+}
+
+.navbar .container-fluid {
+  display: flex;
+  align-items: center;
+  min-height: 96px;
+}
+
+.admin-navbar-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff4e9;
+  font-family: EncodeSans_GC_Semi, sans-serif;
+  font-size: clamp(1rem, 2.2vw, 1.45rem);
+  text-align: center;
+  white-space: nowrap;
 }
 
 /* Allow absolute positioning relative to navbar */
@@ -897,6 +915,14 @@ body.modal-open {
 
 @media (max-width: 768px) {
   /* Navbar */
+  .admin-navbar-title {
+    position: static;
+    transform: none;
+    margin-left: auto;
+    white-space: normal;
+    text-align: right;
+  }
+
   .nav-center {
     position: static;
     transform: none;

@@ -244,175 +244,43 @@
         </nav>
       </aside>
 
-      <main class="content">
-        <div class="panel">
+      <main class="content content-management-page">
+        <div class="panel content-management-panel">
           <header class="panel-header">
             <div>
               <h1 id="pageTitle">Content Management</h1>
-              <p class="subtitle" id="pageSubtitle">
-                Site's Banners, Webpages, Promotions and FAQs
-              </p>
+              <p class="subtitle" id="pageSubtitle">Manage the content shown across the Caravan website</p>
             </div>
-            <button class="btn btn-primary" id="addContentBtn" type="button">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-              >
-                <rect x="3" y="4" width="14" height="17" rx="1.6" />
-                <path d="M18 9v9M14 13h8" />
-              </svg>
-              Add Content
-            </button>
           </header>
 
-          <div class="tabs" id="contentTabs">
-            <button class="tab is-active" type="button" data-filter="all">
-              All
-            </button>
-            <button class="tab" type="button" data-filter="banner">
-              Banners
-            </button>
-            <button class="tab" type="button" data-filter="promotion">
-              Promotions
-            </button>
-            <button class="tab" type="button" data-filter="faq">FAQs</button>
-            <button class="tab" type="button" data-filter="page">Pages</button>
-          </div>
-
-          <section class="section">
-            <div class="products-card">
-              <table class="products-table cm-table">
-                <thead>
-                  <tr>
-                    <th>Preview</th>
-                    <th>Title</th>
-                    <th>Type</th>
-                    <th>Last Edited</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="contentBody">
-                  <tr data-type="banner">
-                    <td>
-                      <span class="cm-preview"></span>
-                    </td>
-                    <td>Homepage Meridian Banner</td>
-                    <td>Banner</td>
-                    <td class="mono">August 24</td>
-                    <td>
-                      <span class="status-pill status-published"
-                        >Published</span
-                      >
-                    </td>
-                    <td>
-                      <div class="cm-actions">
-                        <div class="cm-actions-col">
-                          <a href="#" class="action-view" data-action="view">
-                            View
-                            <svg
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                            >
-                              <path
-                                d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"
-                              />
-                              <circle cx="12" cy="12" r="2.6" />
-                            </svg>
-                          </a>
-                          <a href="#" class="action-edit" data-action="edit">
-                            Edit
-                            <svg
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                            >
-                              <path d="M4 20l4-1 11-11-3-3L5 16l-1 4z" />
-                            </svg>
-                          </a>
-                        </div>
-                        <div class="cm-actions-col">
-                          <a
-                            href="#"
-                            class="action-unpublish"
-                            data-action="unpublish"
-                          >
-                            Unpublish
-                            <svg
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                            >
-                              <path d="M5 21V4l14 8-14 8Z" />
-                            </svg>
-                          </a>
-                          <a
-                            href="#"
-                            class="action-delete"
-                            data-action="delete"
-                          >
-                            Delete
-                            <svg
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                            >
-                              <path d="M4 7h16" />
-                              <path
-                                d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"
-                              />
-                              <path
-                                d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"
-                              />
-                            </svg>
-                          </a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <div class="table-footer">
-                <span id="pageIndicator">1 out of X pages</span>
-                <span class="page-arrows">
-                  <button
-                    id="prevPageBtn"
-                    type="button"
-                    aria-label="Previous page"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M15 6l-6 6 6 6" />
-                    </svg>
-                  </button>
-                  <button id="nextPageBtn" type="button" aria-label="Next page">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M9 6l6 6-6 6" />
-                    </svg>
-                  </button>
-                </span>
+          <section class="content-management" aria-label="Editable website content">
+            <div class="content-management-intro">
+              <div>
+                <h2>Website content</h2>
+                <p>Edit the static texts found in FAQs, About us, and contact details like phone numbers 
+                  and email addresses in the Caravan Application and Website.</p>
               </div>
+              <span class="content-count" id="contentCount">Loading content…</span>
+            </div>
+            <div class="content-editor-list" id="contentEditorList" aria-live="polite">
+              <div class="content-state">Loading content…</div>
             </div>
           </section>
         </div>
       </main>
     </div>
+
+    <dialog class="content-confirm-dialog" id="contentConfirmDialog" aria-labelledby="contentConfirmTitle">
+      <form method="dialog" class="content-confirm-card">
+        <span class="content-confirm-icon" aria-hidden="true">!</span>
+        <h2 id="contentConfirmTitle">Save content changes?</h2>
+        <p id="contentConfirmMessage">Your changes will be published to the website and recorded in the audit trail.</p>
+        <div class="content-confirm-actions">
+          <button class="btn btn-secondary" value="cancel">Keep editing</button>
+          <button class="btn btn-primary" id="confirmContentSave" value="save">Save changes</button>
+        </div>
+      </form>
+    </dialog>
 
     <script src="ADDashboard.js"></script>
     <script src="CMJS.js"></script>

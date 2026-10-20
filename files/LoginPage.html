@@ -21,7 +21,7 @@
       crossorigin="anonymous"
     />
 
-    <title>Login</title>
+    <title>Caravan Admin Management · Sign In</title>
   </head>
   <body>
     <!-- Navbar -->
@@ -29,46 +29,17 @@
       <div class="container-fluid">
         <!-- Logo -->
         <div class="nav-left">
-          <a class="navbar-brand" href="/">
+          <a class="navbar-brand" href="/login" aria-label="Caravan Admin Management sign in">
             <img
               src="./Images/CaravanLogo_Transparent.png"
-              alt="Caravan"
+              alt="Caravan Admin Management"
               height="60"
               id="Caravan_Logo"
             />
           </a>
         </div>
 
-        <!-- Mobile Toggle Button -->
-        <button
-          class="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarSupportedContent"
-          aria-controls="navbarSupportedContent"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
-        >
-          <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <!-- Navbar Content -->
-        <div class="collapse navbar-collapse" id="navbarSupportedContent">
-          <!-- Center Navigation -->
-          <ul class="navbar-nav nav-center">
-            <li class="nav-item1">
-              <a class="nav-link" href="/">Home</a>
-            </li>
-
-            <li class="nav-item1">
-              <a class="nav-link" href="/store">Market</a>
-            </li>
-
-            <li class="nav-item1">
-              <a class="nav-link" href="/faqs">FAQs</a>
-            </li>
-          </ul>
-        </div>
+        <div class="admin-navbar-title">Caravan Admin Management</div>
       </div>
     </nav>
 
@@ -128,56 +99,10 @@
           </button>
         </form>
 
-        <div class="login-link">
-          Don't have an account?
-          <a href="/register">Register here</a>
-        </div>
-        <div class="api-section">
-          <div class="divider">
-            <div class="line"></div>
-              <h6>&emsp; Sign in with &emsp;</h6>
-            <div class="line"></div>
-          </div>
-          <a
-            href="/api/auth/google"
-            style="
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              gap: 10px;
-              width: 100%;
-              padding: 12px;
-              box-sizing: border-box;
-              border: 1px solid #ddd;
-              border-radius: 6px;
-              background: white;
-              color: #333;
-              font-size: 15px;
-              font-weight: 500;
-              text-decoration: none;
-              cursor: pointer;
-            "
-          >
-            <img
-              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-              alt="Google"
-              style="width: 20px; height: 20px"
-            />
-
-            Continue with Google
-          </a>
-        </div>
       </div>
     </div>
 
     <div class="overlay"></div>
-
-    <!-- Bootstrap JavaScript-->
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-      crossorigin="anonymous"
-    ></script>
 
     <!-- JavaScript Linking -->
     <script src="Login.js"></script>

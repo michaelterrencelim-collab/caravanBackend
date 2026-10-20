@@ -35,6 +35,41 @@ app.get("/healthz", (_req, res) => {
   res.json({ ok: true });
 });
 
+const disabledCustomerPages = new Set([
+  "/",
+  "/register",
+  "/faqs",
+  "/store",
+  "/product",
+  "/profile",
+  "/user/shopping",
+  "/user/order",
+  "/user/profile",
+  "/index.html",
+  "/registerpage.html",
+  "/faqs.html",
+  "/storepage.html",
+  "/productpage.html",
+  "/profilepage.html",
+  "/orderhistory.html",
+  "/shoppingcart.html",
+  "/review.html",
+]);
+
+app.use((req, res, next) => {
+  const requestPath = req.path.toLowerCase();
+  if (req.method === "GET" && disabledCustomerPages.has(requestPath)) {
+    return res.redirect("/login");
+  }
+  if (
+    (req.method === "POST" && requestPath === "/api/register") ||
+    (req.method === "GET" && (requestPath === "/api/auth/google" || requestPath === "/api/auth/google/callback"))
+  ) {
+    return res.status(404).json({ error: "This customer authentication route is disabled." });
+  }
+  next();
+});
+
 const routersPath = path.join(__dirname, "routes");
 
 // Recursively load routes
