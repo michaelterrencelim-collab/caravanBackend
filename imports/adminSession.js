@@ -52,4 +52,14 @@ async function releaseAdminSession(adminId, sessionId) {
   });
 }
 
-module.exports = { claimAdminSession, isCurrentAdminSession, releaseAdminSession };
+async function clearAdminSession(adminId) {
+  if (!adminId) return 0;
+  await ensureSessionTable();
+  const result = await db.execute({
+    sql: "DELETE FROM Admin_sessions WHERE Admin_id = ?",
+    args: [adminId],
+  });
+  return Number(result.rowsAffected || 0);
+}
+
+module.exports = { claimAdminSession, isCurrentAdminSession, releaseAdminSession, clearAdminSession };

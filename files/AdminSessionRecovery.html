@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin Session Recovery</title>
+  <style>
+    :root { color-scheme: dark; --bg:#14100c; --panel:#1c1712; --border:#34291d; --gold:#d9a441; --text:#f2ede4; --muted:#a99e91; --red:#e27770; }
+    * { box-sizing:border-box; }
+    body { min-height:100vh; margin:0; padding:24px; display:grid; place-items:center; background:var(--bg); color:var(--text); font:16px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(480px,100%); padding:30px; border:1px solid var(--border); border-radius:16px; background:var(--panel); }
+    h1 { margin:0 0 8px; font-size:1.45rem; }
+    p { color:var(--muted); }
+    .query { padding:12px; border:1px solid var(--border); border-radius:8px; background:#15110d; color:var(--gold); font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+    label { display:block; margin:16px 0 6px; color:var(--muted); font-size:.9rem; }
+    input { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#211b15; color:var(--text); font:inherit; }
+    input:focus { outline:2px solid var(--gold); outline-offset:1px; }
+    button, a { display:inline-block; margin-top:20px; padding:11px 16px; border:0; border-radius:8px; background:var(--gold); color:#1c1712; font:inherit; font-weight:700; text-decoration:none; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:wait; }
+    #recoveryMessage { min-height:1.5em; }
+    #recoveryMessage.error { color:var(--red); }
+    [hidden] { display:none !important; }
+  </style>
+  <script src="/AdminSessionRecovery.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Admin session recovery</h1>
+    <p>This clears the active session lock for the admin account whose credentials you verify below. It only affects that account.</p>
+    <div class="query">DELETE FROM Admin_sessions WHERE Admin_id = [your verified Admin_id];</div>
+    <form id="recoveryForm" autocomplete="on">
+      <label for="adminEmail">Admin email</label>
+      <input id="adminEmail" name="email" type="email" autocomplete="username" required>
+      <label for="adminPassword">Admin password</label>
+      <input id="adminPassword" name="password" type="password" autocomplete="current-password" required>
+      <button id="recoveryButton" type="submit">Clear my session lock</button>
+    </form>
+    <p id="recoveryMessage" role="status" aria-live="polite"></p>
+    <a id="loginLink" href="/login" hidden>Go to admin login</a>
+  </main>
+</body>
+</html>
