@@ -3,6 +3,8 @@ const app = express.Router();
 
 const db = require("../../imports/database");
 const jwt = require("jsonwebtoken");
+const { checkAuth } = require("../../imports/token");
+const { logAudit } = require("../Audit/AuditImport");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -81,6 +83,14 @@ app.post("/login", async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
+    if (isAdmin) {
+      await logAudit({
+        adminId: Number(user.Admin_id),
+        type: "login",
+        description: `Admin #${user.Admin_id} signed in successfully`,
+      });
+    }
+
     // Don't need to send the JWT back to JavaScript anymore
     return res.json({
       role: isAdmin ? "admin" : "user",
@@ -92,6 +102,21 @@ app.post("/login", async (req, res) => {
       error: "Server error",
     });
   }
+});
+
+app.post("/logout", checkAuth("admin"), async (req, res) => {
+  await logAudit({
+    adminId: Number(req.user.adminId),
+    type: "logout",
+    description: `Admin #${req.user.adminId} signed out`,
+  });
+  res.clearCookie("auth", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
+  res.json({ role: "admin", loggedOut: true });
 });
 
 module.exports = app;

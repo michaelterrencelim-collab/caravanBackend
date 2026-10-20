@@ -1,6 +1,7 @@
 const express = require("express");
 const db = require("../../imports/database");
 const { checkAuth } = require("../../imports/token");
+const { logAudit } = require("../Audit/AuditImport");
 
 const router = express.Router();
 router.customPath = "/api/admin";
@@ -175,6 +176,11 @@ router.get("/accounts/customer/:accountId/details", async (req, res) => {
     ]);
 
     if (!customerResult.rows.length) return res.status(404).json({ error: "Customer not found" });
+    await logAudit({
+      adminId: req.user.adminId,
+      type: "account_view",
+      description: `Viewed customer account #${customerId}`,
+    });
     const orders = new Map();
     for (const row of ordersResult.rows) {
       if (!orders.has(Number(row.Order_id))) {
@@ -210,6 +216,21 @@ router.get("/accounts/customer/:accountId/details", async (req, res) => {
   }
 });
 
+router.post("/accounts/actions", async (req, res) => {
+  const action = String(req.body.action || "");
+  const accountId = Number(req.body.accountId);
+  if (action !== "invite_opened" && !(action === "admin_view" && Number.isInteger(accountId) && accountId > 0))
+    return res.status(400).json({ error: "Unsupported account action" });
+  await logAudit({
+    adminId: req.user.adminId,
+    type: action === "admin_view" ? "account_view" : "account_action",
+    description: action === "admin_view"
+      ? `Viewed admin account #${accountId}`
+      : "Opened the Invite User action in Manage Accounts",
+  });
+  res.status(201).json({ recorded: true });
+});
+
 router.put("/accounts/:kind/:accountId/status", async (req, res) => {
   const { kind } = req.params;
   const id = Number(req.params.accountId);
@@ -232,6 +253,11 @@ router.put("/accounts/:kind/:accountId/status", async (req, res) => {
     });
     if (!result.rowsAffected)
       return res.status(404).json({ error: "Account not found" });
+    await logAudit({
+      adminId: req.user.adminId,
+      type: "account_status",
+      description: `Changed ${kind} account #${id} status to ${status}`,
+    });
     res.json({ accountId: id, status });
   } catch (error) {
     fail(res, error, "Unable to update account status");

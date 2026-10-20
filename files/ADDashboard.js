@@ -45,9 +45,14 @@ document.addEventListener("DOMContentLoaded", () => {
     signOutBtn.setAttribute("aria-haspopup", "dialog");
     signOutBtn.addEventListener("click", () => signOutDialog.showModal());
     cancelSignOut.addEventListener("click", () => signOutDialog.close());
-    confirmSignOut.addEventListener("click", () => {
+    confirmSignOut.addEventListener("click", async () => {
       confirmSignOut.disabled = true;
       confirmSignOut.textContent = "Signing out…";
+      try {
+        await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
+      } catch (error) {
+        console.error("Unable to record admin logout:", error);
+      }
       window.location.assign("/login");
     });
     signOutDialog.addEventListener("click", (event) => {

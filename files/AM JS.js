@@ -71,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     filterRows(activeTab, event.target.value);
   });
 
-  if (inviteBtn) inviteBtn.addEventListener("click", () => console.log("Invite User clicked"));
+  if (inviteBtn) inviteBtn.addEventListener("click", () => recordManageAction("invite_opened"));
   loadAccounts();
 
   async function loadAccounts() {
@@ -135,6 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (row.dataset.kind === "customer") loadCustomerDetails(row.dataset.accountId);
       else {
         const role = row.querySelector("td:nth-child(2)")?.textContent.trim() || "Admin";
+        recordManageAction("admin_view", row.dataset.accountId);
         openDetails(name, "Admin account", [
           detailSection("Account information", [["Admin ID", `#${row.dataset.accountId}`], ["Name", name], ["Email", row.querySelector("td:nth-child(3)")?.textContent.trim()], ["Role", role], ["Status", row.dataset.status]]),
         ]);
@@ -200,5 +201,18 @@ document.addEventListener("DOMContentLoaded", () => {
     detailsDialog.querySelector(".account-dialog__eyebrow").textContent = eyebrow;
     detailsBody.innerHTML = sections.join("");
     if (!detailsDialog.open) detailsDialog.showModal();
+  }
+
+  async function recordManageAction(action, accountId) {
+    try {
+      await fetch("/api/admin/accounts/actions", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...(accountId ? { accountId } : {}) }),
+      });
+    } catch (error) {
+      console.error("Unable to record account action:", error);
+    }
   }
 });
