@@ -230,7 +230,9 @@ router.post("/accounts/invitations", async (req, res) => {
 
     const inviterName = [adminResult.rows[0].First_name, adminResult.rows[0].Last_name].filter(Boolean).join(" ") || "A Caravan administrator";
     const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(" ") || "Customer";
-    const baseUrl = String(process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || `${req.protocol}://${req.get("host")}`).replace(/\/+$/, "");
+    const configuredBaseUrl = process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || "";
+    const isLocalBaseUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(?:\/|$)/i.test(configuredBaseUrl);
+    const baseUrl = String(configuredBaseUrl && !isLocalBaseUrl ? configuredBaseUrl : "https://green-porcupine-191590.hostingersite.com").replace(/\/+$/, "");
     const invitationUrl = `${baseUrl}/admin-invitation/?token=${encodeURIComponent(token)}`;
     try {
       await sendAdminInvitation({
