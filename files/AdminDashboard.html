@@ -6,7 +6,7 @@
 <title>Caravan · Dashboard</title>
 <link rel="stylesheet" href="AdminCSS.css">
 </head>
-<body>
+<body class="dashboard-document">
 
 <div class="CaravanDesk">
   <aside class="SideNav">
@@ -83,13 +83,13 @@
   </aside>
 
 
-  <main class="content">
-    <div class="panel">
+  <main class="content dashboard-page-content">
+    <div class="panel dashboard-page-panel">
 
       <header class="panel-header">
         <div>
           <h1 id="pageTitle">Dashboard</h1>
-          <p class="subtitle" id="pageSubtitle">Welcome back, Admin</p>
+          <p class="subtitle" id="pageSubtitle">Welcome back</p>
         </div>
         <button class="notifs" id="bellBtn" type="button" aria-label="Notifications">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 3.5a5.5 5.5 0 0 0-5.5 5.5v3.1c0 .6-.2 1.1-.6 1.6L4.6 15c-.7.8-.1 2 .9 2h13c1 0 1.6-1.2.9-2l-1.3-1.3a2.2 2.2 0 0 1-.6-1.6V9A5.5 5.5 0 0 0 12 3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -97,71 +97,67 @@
         </button>
       </header>
 
-      <section class="section">
-        <h2 class="section-title concerns-title">Current concerns</h2>
+      <div class="dashboard-scroll">
+      <section class="section dashboard-concerns-section">
+        <div class="concerns-heading">
+          <h2 class="section-title concerns-title">Current concerns</h2>
+          <button class="concerns-all-button" id="seeAllConcernsBtn" type="button">See all concerns</button>
+        </div>
 
-        <div class="concerns-card">
-          <div class="concern-row">
-            <div class="concern-left">
-              <svg class="concern-icon warn" viewBox="0 0 24 24" fill="none"><path d="M12 4 2.5 20h19L12 4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="17.3" r="0.9" fill="currentColor"/></svg>
-              <p>Product A stocks are running low</p>
-            </div>
-            <a href="#" class="see-more">See more <span aria-hidden="true">&rarr;</span></a>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="concern-row">
-            <div class="concern-left">
-              <svg class="concern-icon ok" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.4" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.3l2.6 2.6L16.2 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              <p>Product D has now been fully restocked</p>
-            </div>
-            <a href="#" class="see-more">See more <span aria-hidden="true">&rarr;</span></a>
-          </div>
+        <div class="concerns-card" id="concernsList" aria-live="polite">
+          <p class="dashboard-state">Loading current concerns…</p>
         </div>
       </section>
 
-      <section class="section">
+      <section class="section dashboard-orders-section">
         <h2 class="section-title orders-title">Recent Orders</h2>
 
         <div class="orders-card">
-          <table class="orders-table">
+          <div class="dashboard-orders-scroll">
+          <table class="orders-table dashboard-orders-table">
             <thead>
               <tr>
                 <th>Order ID</th>
                 <th>Customer ID</th>
                 <th>Product ID</th>
                 <th>Status</th>
+                <th><span class="sr-only">Open order</span></th>
               </tr>
             </thead>
             <tbody id="ordersBody">
-              <tr>
-                <td class="mono strong">#1111</td>
-                <td class="mono">#00000324</td>
-                <td class="mono">#00000111</td>
-                <td><span class="status status-completed">Completed</span></td>
-              </tr>
-              <tr>
-                <td class="mono strong">#1112</td>
-                <td class="mono">#00000816</td>
-                <td class="mono">#00445001</td>
-                <td><span class="status status-processing">Processing</span></td>
-              </tr>
-              <tr>
-                <td class="mono strong">#1113</td>
-                <td class="mono">#00000816</td>
-                <td class="mono">#00003450</td>
-                <td><span class="status status-processing">Processing</span></td>
-              </tr>
+              <tr><td colspan="5">Loading recent orders…</td></tr>
             </tbody>
           </table>
+          </div>
         </div>
       </section>
+      </div>
 
     </div>
   </main>
 
 </div>
+
+<dialog class="concerns-dialog" id="allConcernsDialog" aria-labelledby="allConcernsTitle" aria-describedby="allConcernsDescription">
+  <div class="concerns-dialog__content">
+    <header class="concerns-dialog__header">
+      <div>
+        <p class="concerns-dialog__eyebrow">Dashboard</p>
+        <h2 id="allConcernsTitle">All current concerns</h2>
+        <p id="allConcernsDescription">Products at or below the low stock threshold.</p>
+      </div>
+      <button class="concerns-dialog__close" id="closeConcernsDialog" type="button" aria-label="Close concerns">×</button>
+    </header>
+    <div class="concerns-dialog__rows" id="allConcernsList" aria-live="polite"></div>
+    <footer class="concerns-dialog__footer">
+      <span id="concernsPageIndicator">Page 1 of 1</span>
+      <div class="concerns-dialog__pagination">
+        <button id="previousConcernsPage" type="button" aria-label="Previous concerns page">Previous</button>
+        <button id="nextConcernsPage" type="button" aria-label="Next concerns page">Next</button>
+      </div>
+    </footer>
+  </div>
+</dialog>
 
 <script src="ADDashboard.js"></script>
 </body>

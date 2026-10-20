@@ -332,6 +332,43 @@ button { font-family: inherit; cursor: pointer; }
 .status-completed { color: var(--green); }
 .status-processing { color: var(--gold); }
 
+/* Keep the dashboard shell fixed while its own content areas scroll. */
+body.dashboard-document { height: 100vh; overflow: hidden; }
+.dashboard-document .CaravanDesk { height: 100vh; min-height: 0; overflow: hidden; }
+.dashboard-document .content.dashboard-page-content { min-width: 0; min-height: 0; overflow: hidden; }
+.dashboard-document .dashboard-page-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.dashboard-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 8px 8px 0 0; overscroll-behavior: contain; }
+.dashboard-concerns-section { margin-bottom: 30px; }
+.concerns-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.concerns-heading .section-title { margin: 0; }
+.concerns-all-button { border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; color: var(--gold); background: transparent; font-size: .86rem; transition: background .15s ease, border-color .15s ease; }
+.concerns-all-button:hover { background: rgba(217, 164, 65, .1); border-color: var(--gold-dim); }
+.dashboard-state { margin: 0; padding: 18px 0; color: var(--text-secondary); }
+.dashboard-orders-scroll { max-height: min(50vh, 500px); overflow-y: auto; overscroll-behavior: contain; }
+.dashboard-orders-table { min-width: 620px; }
+.dashboard-orders-table thead { position: sticky; top: 0; z-index: 1; background: var(--card-bg); }
+.dashboard-orders-table tbody td { padding-top: 14px; padding-bottom: 14px; }
+.order-open-cell { width: 44px; text-align: right; }
+.order-open-link { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 50%; color: var(--gold); font-size: 1.25rem; transition: background .15s ease, border-color .15s ease; }
+.order-open-link:hover { background: rgba(217, 164, 65, .12); border-color: var(--gold-dim); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.concerns-dialog { width: min(760px, calc(100vw - 32px)); max-height: min(82vh, 760px); padding: 0; overflow: hidden; border: 1px solid #49372a; border-radius: 18px; background: var(--panel-bg); color: var(--text-primary); box-shadow: 0 24px 80px rgba(0, 0, 0, .6); }
+.concerns-dialog::backdrop { background: rgba(8, 6, 4, .76); backdrop-filter: blur(3px); }
+.concerns-dialog__content { display: flex; max-height: min(82vh, 760px); flex-direction: column; padding: 22px; }
+.concerns-dialog__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+.concerns-dialog__eyebrow { margin: 0 0 4px; color: var(--gold); font-size: .82rem; }
+.concerns-dialog__header h2 { margin: 0 0 6px; font-size: 1.25rem; }
+.concerns-dialog__header p:last-child { margin: 0; color: var(--text-secondary); font-size: .9rem; }
+.concerns-dialog__close { width: 36px; height: 36px; flex: 0 0 auto; border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--text-secondary); font-size: 1.4rem; line-height: 1; }
+.concerns-dialog__close:hover { border-color: var(--gold-dim); color: var(--gold); }
+.concerns-dialog__rows { max-height: min(55vh, 520px); min-height: 120px; overflow-y: auto; overscroll-behavior: contain; padding: 0 10px 0 2px; }
+.concerns-dialog__rows .concern-row { min-height: 56px; }
+.concerns-dialog__footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: .88rem; }
+.concerns-dialog__pagination { display: flex; gap: 8px; }
+.concerns-dialog__pagination button { min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-primary); }
+.concerns-dialog__pagination button:hover:not(:disabled) { border-color: var(--gold-dim); color: var(--gold); }
+.concerns-dialog__pagination button:disabled { cursor: not-allowed; opacity: .4; }
+
 /* ---------- Products & Reports toolbar/table ---------- */
 
 .toolbar {
@@ -534,6 +571,12 @@ button { font-family: inherit; cursor: pointer; }
   .content { padding: 16px; }
   .panel { padding: 22px 18px 28px; }
 
+  body.dashboard-document { height: 100vh; overflow: hidden; }
+  .dashboard-document .CaravanDesk { height: 100vh; min-height: 0; }
+  .dashboard-document .SideNav { flex: 0 0 auto; }
+  .dashboard-document .content.dashboard-page-content { flex: 1 1 auto; min-height: 0; }
+  .dashboard-document .dashboard-page-panel { padding: 22px 18px 24px; }
+
   .toolbar { flex-wrap: wrap; }
   .search-field { flex-basis: 100%; }
 }
@@ -549,6 +592,9 @@ button { font-family: inherit; cursor: pointer; }
   }
 
   .see-more { align-self: flex-end; }
+  .dashboard-orders-scroll { max-height: 48vh; }
+  .concerns-dialog__content { padding: 18px; }
+  .concerns-dialog__rows { max-height: 52vh; }
 }
 
 a:focus-visible, button:focus-visible {

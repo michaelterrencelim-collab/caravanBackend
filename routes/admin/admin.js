@@ -13,16 +13,36 @@ const fail = (res, error, message) => {
   return res.status(500).json({ error: message });
 };
 
-router.get("/dashboard", async (_req, res) => {
+const DASHBOARD_LOW_STOCK_THRESHOLD = 20;
+
+router.get("/dashboard", async (req, res) => {
   try {
-    const result = await db.execute({
-      sql: `SELECT o.Order_id, o.Customer_id, oi.Product_id, os.Order_status
-            FROM Orders o
-            LEFT JOIN Order_status os ON os.Status_id = o.Status_id
-            LEFT JOIN Order_items oi ON oi.Order_id = o.Order_id
-            ORDER BY o.Order_date DESC, o.Order_id DESC LIMIT 10`,
-    });
-    res.json({ recentOrders: result.rows });
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.today || "")) ? req.query.today : null;
+    const [orders, concerns, admin] = await Promise.all([
+      db.execute({
+        sql: `SELECT o.Order_id, o.Customer_id, GROUP_CONCAT(DISTINCT oi.Product_id) AS Product_ids, os.Order_status
+              FROM Orders o
+              LEFT JOIN Order_status os ON os.Status_id = o.Status_id
+              LEFT JOIN Order_items oi ON oi.Order_id = o.Order_id
+              WHERE date(o.Order_date) = COALESCE(?, date('now', 'localtime'))
+              GROUP BY o.Order_id, o.Customer_id, os.Order_status, o.Order_date
+              ORDER BY o.Order_date DESC, o.Order_id DESC LIMIT 10`,
+        args: [today],
+      }),
+      db.execute({
+        sql: `SELECT product_id, Prod_name, Prod_amount
+              FROM Product
+              WHERE Prod_amount <= ?
+              ORDER BY Prod_amount ASC, product_id ASC`,
+        args: [DASHBOARD_LOW_STOCK_THRESHOLD],
+      }),
+      db.execute({
+        sql: "SELECT First_name, Last_name FROM Admin WHERE Admin_id = ?",
+        args: [req.user.adminId],
+      }),
+    ]);
+    const adminName = [admin.rows[0]?.First_name, admin.rows[0]?.Last_name].filter(Boolean).join(" ") || "Admin";
+    res.json({ recentOrders: orders.rows, concerns: concerns.rows, adminName });
   } catch (error) {
     fail(res, error, "Unable to retrieve dashboard");
   }

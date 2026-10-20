@@ -15,7 +15,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const baseSubtitle = pageSubtitle.textContent;
   const DEFAULT_SORT = "date-desc";
 
-  const state = { search: "", status: "", from: "", to: "", sort: DEFAULT_SORT, page: 1, totalPages: 1 };
+  const requestedOrderId = new URLSearchParams(window.location.search).get("orderId");
+  const state = { search: "", orderId: /^\d+$/.test(requestedOrderId || "") ? requestedOrderId : "", status: "", from: "", to: "", sort: DEFAULT_SORT, page: 1, totalPages: 1 };
+  if (state.orderId) searchInput.value = state.orderId;
   let statuses = []; 
   let requestCounter = 0; 
 
@@ -89,6 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function filterQuery(extra = {}) {
     const params = new URLSearchParams(extra);
     if (state.search) params.set("search", state.search);
+    if (state.orderId) params.set("orderId", state.orderId);
     if (state.status) params.set("status", state.status);
     if (state.from) params.set("from", state.from);
     if (state.to) params.set("to", state.to);
@@ -280,6 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
     fromInput.value = "";
     toInput.value = "";
     sortSelect.value = DEFAULT_SORT;
+    state.orderId = "";
     applyPanelFilters();
   });
 
@@ -414,6 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
   searchInput.addEventListener("input", () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
+      state.orderId = "";
       state.search = searchInput.value.trim();
       reloadFromFirstPage();
     }, 300);

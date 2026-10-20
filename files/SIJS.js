@@ -11,7 +11,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const pageIndicator = document.getElementById("pageIndicator");
   const pageSubtitle = document.getElementById("pageSubtitle");
 
-  const state = { filter: "all", search: "", page: 1, totalPages: 1 };
+  const requestedProductId = new URLSearchParams(window.location.search).get("productId");
+  const state = { filter: "all", search: requestedProductId || "", page: 1, totalPages: 1 };
+  if (requestedProductId) searchInput.value = requestedProductId;
   let requestCounter = 0; // ignore out-of-date responses while typing/clicking fast
 
   const THUMB_SVG =

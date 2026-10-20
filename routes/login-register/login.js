@@ -3,7 +3,9 @@ const app = express.Router();
 
 const db = require("../../imports/database");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const { checkAuth } = require("../../imports/token");
+const { claimAdminSession, releaseAdminSession } = require("../../imports/adminSession");
 const { logAudit } = require("../Audit/AuditImport");
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -41,17 +43,27 @@ app.post("/login", async (req, res) => {
 
     const user = admins[0];
 
+    const sessionId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const token = jwt.sign(
       {
         adminId: user.Admin_id,
         email: user.Admin_email,
         role: "admin",
+        sid: sessionId,
       },
       JWT_SECRET,
       {
         expiresIn: "24h",
       },
     );
+
+    const sessionClaimed = await claimAdminSession(Number(user.Admin_id), sessionId, expiresAt);
+    if (!sessionClaimed) {
+      return res.status(409).json({
+        error: "This admin account is already signed in on another device. Sign out there or wait for the session to expire.",
+      });
+    }
 
     // Store JWT in HTTP-only cookie
     res.cookie("auth", token, {
@@ -81,6 +93,7 @@ app.post("/login", async (req, res) => {
 });
 
 app.post("/logout", checkAuth("admin"), async (req, res) => {
+  await releaseAdminSession(Number(req.user.adminId), req.user.sid);
   await logAudit({
     adminId: Number(req.user.adminId),
     type: "logout",
