@@ -136,6 +136,65 @@ router.get("/accounts", async (_req, res) => {
   }
 });
 
+router.get("/accounts/customer/:accountId/vouchers/available", async (req, res) => {
+  const customerId = Number(req.params.accountId);
+  if (!Number.isInteger(customerId) || customerId < 1)
+    return res.status(400).json({ error: "Invalid customer ID" });
+  try {
+    const result = await db.execute({
+      sql: `SELECT v.Voucher_id, v.Voucher_name, v.Voucher_desc, v.discount
+            FROM Vouchers v
+            WHERE NOT EXISTS (
+              SELECT 1 FROM Customer_vouchers cv
+              WHERE cv.Customer_id = ? AND cv.Voucher_id = v.Voucher_id
+                AND LOWER(COALESCE(cv.Voucher_status, '')) = 'unused'
+            )
+            ORDER BY v.Voucher_id`,
+      args: [customerId],
+    });
+    res.json(result.rows);
+  } catch (error) {
+    fail(res, error, "Unable to retrieve available vouchers");
+  }
+});
+
+router.post("/accounts/customer/:accountId/vouchers", async (req, res) => {
+  const customerId = Number(req.params.accountId);
+  const voucherId = Number(req.body.voucherId);
+  if (!Number.isInteger(customerId) || customerId < 1 || !Number.isInteger(voucherId) || voucherId < 1)
+    return res.status(400).json({ error: "Valid customerId and voucherId are required" });
+  try {
+    const [customer, voucher, existingAssignment] = await Promise.all([
+      db.execute({ sql: "SELECT Customer_id FROM Customer WHERE Customer_id = ?", args: [customerId] }),
+      db.execute({ sql: "SELECT Voucher_id, Voucher_name FROM Vouchers WHERE Voucher_id = ?", args: [voucherId] }),
+      db.execute({ sql: "SELECT Voucher_status FROM Customer_vouchers WHERE Customer_id = ? AND Voucher_id = ?", args: [customerId, voucherId] }),
+    ]);
+    if (!customer.rows.length) return res.status(404).json({ error: "Customer not found" });
+    if (!voucher.rows.length) return res.status(404).json({ error: "Voucher not found" });
+
+    const inserted = await db.execute({
+      sql: `INSERT INTO Customer_vouchers (Customer_id, Voucher_id, Voucher_status)
+            VALUES (?, ?, 'Unused')
+            ON CONFLICT(Customer_id, Voucher_id) DO UPDATE SET Voucher_status = 'Unused'
+            WHERE LOWER(COALESCE(Customer_vouchers.Voucher_status, '')) <> 'unused'`,
+      args: [customerId, voucherId],
+    });
+    if (!inserted.rowsAffected)
+      return res.status(409).json({ error: "This customer already has an unused copy of that voucher" });
+
+    const voucherName = voucher.rows[0].Voucher_name || `Voucher #${voucherId}`;
+    const wasUsed = existingAssignment.rows[0]?.Voucher_status?.toLowerCase() === "used";
+    await logAudit({
+      adminId: req.user.adminId,
+      type: "customer_voucher",
+      description: `${wasUsed ? "Reissued used" : "Gave"} ${voucherName} (Voucher #${voucherId}) to customer #${customerId} with status Unused`,
+    });
+    res.status(201).json({ customerId, voucherId, voucherName, status: "Unused" });
+  } catch (error) {
+    fail(res, error, "Unable to give voucher to customer");
+  }
+});
+
 router.get("/accounts/customer/:accountId/details", async (req, res) => {
   const customerId = Number(req.params.accountId);
   if (!Number.isInteger(customerId) || customerId < 1)

@@ -1,3 +1,51 @@
+.audit-document {
+  height: 100%;
+  overflow: hidden;
+}
+
+.audit-document .CaravanDesk {
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.audit-page-content {
+  box-sizing: border-box;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.audit-page-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.audit-page-panel > .toolbar,
+.audit-page-panel > .at-bar {
+  flex: 0 0 auto;
+}
+
+.audit-section {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.audit-card {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .tabs {
   display: flex;
   align-items: center;
@@ -44,9 +92,17 @@
 
 .log-list {
   list-style: none;
+  min-height: 0;
+  flex: 1;
   margin: 0;
   padding: 4px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-dim) var(--card-bg);
 }
+
+.audit-card .table-footer { flex: 0 0 auto; }
 
 .log-row {
   display: flex;

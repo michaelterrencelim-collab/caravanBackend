@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="AdminCSS.css">
 <link rel="stylesheet" href="AM CSS.css">
 </head>
-<body>
+<body class="account-management-document">
 
 <div class="CaravanDesk">
   <aside class="SideNav">
@@ -83,8 +83,8 @@
     </nav>
   </aside>
 
-  <main class="content">
-    <div class="panel">
+  <main class="content account-page-content">
+    <div class="panel account-page-panel">
 
       <header class="panel-header">
         <div>
@@ -97,7 +97,7 @@
         </button>
       </header>
 
-      <section class="section">
+      <section class="section account-page-section">
 
         <div class="accounts-header-row">
           <h2 class="section-title" style="margin-bottom:0;">Account Management</h2>
@@ -121,9 +121,16 @@
             <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.7"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
             <input type="text" id="accountSearchInput" placeholder="Search for a customer">
           </div>
+          <label class="account-filter-label" for="accountStatusFilter">Status</label>
+          <select class="account-status-filter" id="accountStatusFilter" aria-label="Filter accounts by status">
+            <option value="all">All statuses</option>
+            <option value="enabled">Enabled</option>
+            <option value="disabled">Disabled</option>
+          </select>
         </div>
         <div class="accounts-panel is-active" id="panelCustomer">
-          <div class="products-card">
+          <div class="products-card account-table-card">
+            <div class="account-table-scroll">
             <table class="products-table">
               <thead>
                 <tr>
@@ -188,12 +195,13 @@
                 </tr>
               </tbody>
             </table>
+            </div>
 
             <div class="table-footer">
-              <span>1 out of X pages</span>
+              <span id="customerPageIndicator">1 out of 1 pages</span>
               <div class="page-arrows">
-                <button type="button" aria-label="Previous page"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                <button type="button" aria-label="Next page"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <button id="customerPrevPage" type="button" aria-label="Previous customer page"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <button id="customerNextPage" type="button" aria-label="Next customer page"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
               </div>
             </div>
           </div>
@@ -201,7 +209,8 @@
 
         <!-- Admin Accounts -->
         <div class="accounts-panel" id="panelAdmin">
-          <div class="products-card">
+          <div class="products-card account-table-card">
+            <div class="account-table-scroll">
             <table class="products-table">
               <thead>
                 <tr>
@@ -264,12 +273,13 @@
                 </tr>
               </tbody>
             </table>
+            </div>
 
             <div class="table-footer">
-              <span>1 out of X pages</span>
+              <span id="adminPageIndicator">1 out of 1 pages</span>
               <div class="page-arrows">
-                <button type="button" aria-label="Previous page"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                <button type="button" aria-label="Next page"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <button id="adminPrevPage" type="button" aria-label="Previous admin page"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <button id="adminNextPage" type="button" aria-label="Next admin page"><svg viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
               </div>
             </div>
           </div>

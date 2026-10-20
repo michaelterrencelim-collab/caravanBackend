@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="AdminCSS.css">
 <link rel="stylesheet" href="AuditCSS.css">
 </head>
-<body>
+<body class="audit-document">
 
 <div class="CaravanDesk">
   <aside class="SideNav">
@@ -83,8 +83,8 @@
     </nav>
   </aside>
 
-  <main class="content">
-    <div class="panel">
+  <main class="content audit-page-content">
+    <div class="panel audit-page-panel">
 
       <header class="panel-header">
         <div>
@@ -113,13 +113,13 @@
           <button class="tab" type="button" data-filter="sign-in">Sign-In</button>
         </div>
         <button class="btn at-sort" id="sortBtn" type="button">
-          Sort by: this week
+          Sort by: today
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 9v6l-4 2v-8z"/></svg>
         </button>
       </div>
 
-      <section class="section">
-        <div class="products-card">
+      <section class="section audit-section">
+        <div class="products-card audit-card">
           <ul class="log-list" id="logList">
             <li class="log-row" data-type="deleted">
               <span class="log-icon log-icon-delete" aria-hidden="true">

@@ -18,7 +18,20 @@
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-dim) var(--card-bg);
+}
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: var(--card-bg); border-radius: 999px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--gold-dim);
+  border: 2px solid var(--card-bg);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 html, body { height: 100%; }
 
 body {

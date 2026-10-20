@@ -2,8 +2,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const API = "/api";
   const PAGE_SIZE = 10;
   const RANGES = [
-    { key: "week", label: "this week" },
     { key: "today", label: "today" },
+    { key: "week", label: "this week" },
     { key: "month", label: "this month" },
     { key: "all", label: "all time" },
   ];
