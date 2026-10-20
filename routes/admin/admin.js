@@ -2,6 +2,8 @@ const express = require("express");
 const db = require("../../imports/database");
 const { checkAuth } = require("../../imports/token");
 const { logAudit } = require("../Audit/AuditImport");
+const { sendAdminInvitation } = require("../../imports/email");
+const { ensureAdminInvitationTable, createInvitationToken, hashInvitationToken } = require("../../imports/adminInvitations");
 
 const router = express.Router();
 router.customPath = "/api/admin";
@@ -156,6 +158,103 @@ router.get("/accounts", async (_req, res) => {
   }
 });
 
+router.get("/accounts/invite-candidates", async (_req, res) => {
+  try {
+    const result = await db.execute({
+      sql: `SELECT c.Customer_id AS accountId, c.first_name, c.last_name
+            FROM Customer c
+            WHERE LOWER(COALESCE(c.Status, '')) = 'enabled'
+              AND NOT EXISTS (
+                SELECT 1 FROM Admin a WHERE LOWER(a.Admin_email) = LOWER(c.Cus_email)
+              )
+            ORDER BY c.first_name, c.last_name, c.Customer_id`,
+    });
+    res.json(result.rows);
+  } catch (error) {
+    fail(res, error, "Unable to retrieve invite candidates");
+  }
+});
+
+router.post("/accounts/invitations", async (req, res) => {
+  const customerId = Number(req.body.customerId);
+  const password = typeof req.body.password === "string" ? req.body.password : "";
+  if (!Number.isInteger(customerId) || customerId < 1 || !password)
+    return res.status(400).json({ error: "Select a customer and enter your admin password" });
+
+  try {
+    const adminResult = await db.execute({
+      sql: `SELECT First_name, Last_name FROM Admin
+            WHERE Admin_id = ? AND Admin_password = ?
+              AND LOWER(COALESCE(Account_status, 'enabled')) NOT IN ('disabled', 'suspended')`,
+      args: [req.user.adminId, password],
+    });
+    if (!adminResult.rows.length)
+      return res.status(403).json({ error: "Admin password is incorrect" });
+
+    const customerResult = await db.execute({
+      sql: `SELECT c.Customer_id, c.first_name, c.last_name, c.Cus_email, c.Cus_password
+            FROM Customer c
+            WHERE c.Customer_id = ? AND LOWER(COALESCE(c.Status, '')) = 'enabled'
+              AND NOT EXISTS (
+                SELECT 1 FROM Admin a WHERE LOWER(a.Admin_email) = LOWER(c.Cus_email)
+              )`,
+      args: [customerId],
+    });
+    const customer = customerResult.rows[0];
+    if (!customer) return res.status(404).json({ error: "Enabled customer not found or already an admin" });
+    if (!customer.Cus_password)
+      return res.status(409).json({ error: "This customer has no password set and cannot sign in to the admin portal yet" });
+
+    await ensureAdminInvitationTable();
+    const token = createInvitationToken();
+    const tokenHash = hashInvitationToken(token);
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const invitationTx = await db.transaction("write");
+    try {
+      await invitationTx.execute({
+        sql: `UPDATE Admin_invitations SET Status = 'superseded'
+              WHERE Customer_id = ? AND Status = 'pending'`,
+        args: [customerId],
+      });
+      await invitationTx.execute({
+        sql: `INSERT INTO Admin_invitations
+                (Customer_id, Customer_email, Invited_by, Token_hash, Expires_at, Status)
+              VALUES (?, ?, ?, ?, ?, 'pending')`,
+        args: [customerId, customer.Cus_email, req.user.adminId, tokenHash, expiresAt],
+      });
+      await invitationTx.commit();
+    } catch (error) {
+      await invitationTx.rollback();
+      throw error;
+    }
+
+    const inviterName = [adminResult.rows[0].First_name, adminResult.rows[0].Last_name].filter(Boolean).join(" ") || "A Caravan administrator";
+    const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(" ") || "Customer";
+    const baseUrl = String(process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || `${req.protocol}://${req.get("host")}`).replace(/\/+$/, "");
+    const invitationUrl = `${baseUrl}/admin-invitation/?token=${encodeURIComponent(token)}`;
+    try {
+      await sendAdminInvitation({
+        customerEmail: customer.Cus_email,
+        customerName,
+        inviterName,
+        invitationUrl,
+        expiresAt,
+      });
+    } catch (emailError) {
+      await db.execute({
+        sql: "UPDATE Admin_invitations SET Status = 'email_failed' WHERE Token_hash = ? AND Status = 'pending'",
+        args: [tokenHash],
+      });
+      console.error("Unable to send admin invitation email:", emailError);
+      return res.status(502).json({ error: "The invitation email could not be sent. Check email configuration and try again." });
+    }
+
+    res.status(202).json({ sent: true, customerName });
+  } catch (error) {
+    fail(res, error, "Unable to send admin invitation");
+  }
+});
+
 router.get("/accounts/customer/:accountId/vouchers/available", async (req, res) => {
   const customerId = Number(req.params.accountId);
   if (!Number.isInteger(customerId) || customerId < 1)
@@ -298,14 +397,12 @@ router.get("/accounts/customer/:accountId/details", async (req, res) => {
 router.post("/accounts/actions", async (req, res) => {
   const action = String(req.body.action || "");
   const accountId = Number(req.body.accountId);
-  if (action !== "invite_opened" && !(action === "admin_view" && Number.isInteger(accountId) && accountId > 0))
+  if (!(action === "admin_view" && Number.isInteger(accountId) && accountId > 0))
     return res.status(400).json({ error: "Unsupported account action" });
   await logAudit({
     adminId: req.user.adminId,
-    type: action === "admin_view" ? "account_view" : "account_action",
-    description: action === "admin_view"
-      ? `Viewed admin account #${accountId}`
-      : "Opened the Invite User action in Manage Accounts",
+    type: "account_view",
+    description: `Viewed admin account #${accountId}`,
   });
   res.status(201).json({ recorded: true });
 });

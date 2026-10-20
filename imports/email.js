@@ -162,6 +162,30 @@ async function sendOrderConfirmation({
     });
 }
 
+async function sendAdminInvitation({ customerEmail, customerName, inviterName, invitationUrl, expiresAt }) {
+    const expiryText = new Date(expiresAt).toLocaleString("en-PH", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Asia/Manila"
+    });
+    await transporter.sendMail({
+        from: `"Caravan Admin" <${process.env.EMAIL_USER}>`,
+        to: customerEmail,
+        subject: "Caravan admin access invitation",
+        text: `Hello ${customerName}, ${inviterName} invited you to become a Caravan admin. Review the invitation and accept or decline it here: ${invitationUrl}. This invitation expires ${expiryText}.`,
+        html: `
+            <div style="max-width:600px;margin:0 auto;padding:28px;font-family:Arial,sans-serif;color:#29231c;background:#f8f4ed;">
+                <h2 style="color:#9b6d19;margin-top:0;">Caravan admin invitation</h2>
+                <p>Hello ${escapeHTML(customerName || "Customer")},</p>
+                <p>${escapeHTML(inviterName || "A Caravan administrator")} invited you to join the Caravan admin team.</p>
+                <p>Review the invitation to accept or decline. Accepting will let you sign in to Caravan Admin Management with your existing Caravan account credentials.</p>
+                <p style="margin:26px 0;"><a href="${escapeHTML(invitationUrl)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#d9a441;color:#1c1712;text-decoration:none;font-weight:bold;">Review invitation</a></p>
+                <p style="color:#71675a;font-size:13px;">This invitation expires ${escapeHTML(expiryText)}. If you did not expect this invitation, you can ignore this email.</p>
+            </div>
+        `
+    });
+}
+
 function escapeHTML(value) {
     return String(value || "").replace(
         /[&<>"']/g,
@@ -184,5 +208,6 @@ transporter.verify(function(error, success) {
 });
 
 module.exports = {
-    sendOrderConfirmation
+    sendOrderConfirmation,
+    sendAdminInvitation
 };

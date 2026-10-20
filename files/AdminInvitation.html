@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Caravan Admin Invitation</title>
+  <style>
+    :root { color-scheme: dark; --bg:#14100c; --panel:#1c1712; --card:#211b15; --border:#34291d; --gold:#d9a441; --text:#f2ede4; --muted:#9a9084; --red:#d9534f; }
+    * { box-sizing:border-box; }
+    body { min-height:100vh; margin:0; padding:24px; display:grid; place-items:center; background:var(--bg); color:var(--text); font:16px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    .invitation-card { width:min(520px,100%); padding:34px; border:1px solid var(--border); border-radius:18px; background:var(--panel); box-shadow:0 24px 72px #0008; }
+    .brand { margin:0 0 8px; color:var(--gold); font-size:.85rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+    h1 { margin:0 0 10px; font-size:1.65rem; }
+    #invitationMessage { margin:0; color:var(--muted); }
+    #invitationExpiry { margin:16px 0 0; color:var(--muted); font-size:.86rem; }
+    .actions { display:flex; gap:10px; margin-top:26px; }
+    button { flex:1; min-height:44px; padding:10px 14px; border:1px solid var(--border); border-radius:9px; background:transparent; color:var(--text); font:inherit; font-weight:600; cursor:pointer; }
+    button:hover:not(:disabled) { border-color:var(--gold); }
+    button.accept { border-color:var(--gold); background:var(--gold); color:#1c1712; }
+    button:disabled { cursor:default; opacity:.55; }
+    [hidden] { display:none !important; }
+    @media(max-width:480px) { .invitation-card { padding:26px 20px; } .actions { flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <main class="invitation-card">
+    <p class="brand">Caravan Admin Management</p>
+    <h1>Admin invitation</h1>
+    <p id="invitationMessage" role="status" aria-live="polite">Checking your invitation…</p>
+    <p id="invitationExpiry" hidden></p>
+    <div class="actions" id="invitationActions" hidden>
+      <button class="accept" type="button" data-decision="accept">Accept invitation</button>
+      <button type="button" data-decision="decline">Decline</button>
+    </div>
+  </main>
+  <script src="/AdminInvitation.js" defer></script>
+</body>
+</html>

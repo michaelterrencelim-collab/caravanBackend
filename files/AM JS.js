@@ -34,6 +34,22 @@ document.addEventListener("DOMContentLoaded", () => {
   voucherDialog.setAttribute("aria-labelledby", "voucherDialogTitle");
   voucherDialog.innerHTML = '<div class="account-dialog__header"><div><p class="account-dialog__eyebrow">Manage Accounts</p><h2 id="voucherDialogTitle">Give a voucher</h2></div><button type="button" class="account-dialog__close" aria-label="Close voucher selection">&times;</button></div><div class="account-dialog__body"><p class="voucher-picker-description" id="voucherPickerDescription"></p><div class="voucher-picker-list" id="voucherPickerList" role="radiogroup" aria-label="Available vouchers"></div><p class="voucher-picker-message" id="voucherPickerMessage" role="status" aria-live="polite"></p><div class="account-dialog__actions"><button type="button" class="account-dialog__cancel">Cancel</button><button type="button" class="account-dialog__confirm" id="giveVoucherConfirm" disabled>Give voucher</button></div></div>';
   document.body.append(voucherDialog);
+  const inviteDialog = document.createElement("dialog");
+  inviteDialog.className = "account-dialog account-invite-dialog";
+  inviteDialog.setAttribute("aria-labelledby", "inviteDialogTitle");
+  inviteDialog.innerHTML = '<div class="account-dialog__header"><div><p class="account-dialog__eyebrow">Manage Accounts</p><h2 id="inviteDialogTitle">Invite a customer as admin</h2></div><div class="invite-dialog__header-actions"><button type="button" class="invite-add-button" id="inviteAddButton" disabled>Add +</button><button type="button" class="account-dialog__close" id="closeInviteDialog" aria-label="Close invite selection">&times;</button></div></div><div class="account-dialog__body"><p class="voucher-picker-description">Select an enabled customer to invite. Only customer names are shown.</p><div class="invite-customer-list" id="inviteCustomerList" role="listbox" aria-label="Enabled customers"></div><p class="voucher-picker-message" id="invitePickerMessage" role="status" aria-live="polite"></p></div>';
+  document.body.append(inviteDialog);
+  const invitePasswordDialog = document.createElement("dialog");
+  invitePasswordDialog.className = "account-dialog account-confirm-dialog invite-password-dialog";
+  invitePasswordDialog.setAttribute("aria-labelledby", "invitePasswordTitle");
+  invitePasswordDialog.innerHTML = '<div class="account-dialog__body"><span class="account-dialog__warning invite-security-icon" aria-hidden="true">+</span><h2 id="invitePasswordTitle">Confirm invitation</h2><p id="invitePasswordDescription"></p><label class="invite-password-label" for="inviteAdminPassword">Enter your admin password to send this invitation</label><input id="inviteAdminPassword" class="invite-password-input" type="password" autocomplete="current-password" required><p class="account-dialog__error invite-password-error" id="invitePasswordError" role="alert"></p><div class="account-dialog__actions"><button type="button" class="account-dialog__cancel" id="cancelInviteConfirmation">Cancel</button><button type="button" class="account-dialog__confirm" id="confirmInviteButton">Confirm</button></div></div>';
+  document.body.append(invitePasswordDialog);
+  const inviteAddButton = inviteDialog.querySelector("#inviteAddButton");
+  const inviteCustomerList = inviteDialog.querySelector("#inviteCustomerList");
+  const invitePickerMessage = inviteDialog.querySelector("#invitePickerMessage");
+  const inviteAdminPassword = invitePasswordDialog.querySelector("#inviteAdminPassword");
+  const invitePasswordError = invitePasswordDialog.querySelector("#invitePasswordError");
+  const confirmInviteButton = invitePasswordDialog.querySelector("#confirmInviteButton");
   const voucherPickerList = voucherDialog.querySelector("#voucherPickerList");
   const voucherPickerMessage = voucherDialog.querySelector("#voucherPickerMessage");
   const giveVoucherConfirm = voucherDialog.querySelector("#giveVoucherConfirm");
@@ -41,6 +57,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let voucherAssigned = false;
   let pendingStatusChange = null;
   let voucherTarget = null;
+  let selectedInviteCustomer = null;
+  let inviteRequestPending = false;
   detailsDialog.querySelector(".account-dialog__close").addEventListener("click", () => detailsDialog.close());
   detailsDialog.addEventListener("click", (event) => { if (event.target === detailsDialog) detailsDialog.close(); });
   confirmDialog.querySelector(".account-dialog__cancel").addEventListener("click", () => confirmDialog.close());
@@ -48,6 +66,35 @@ document.addEventListener("DOMContentLoaded", () => {
   voucherDialog.querySelector(".account-dialog__close").addEventListener("click", () => voucherDialog.close());
   voucherDialog.querySelector(".account-dialog__cancel").addEventListener("click", () => voucherDialog.close());
   voucherDialog.addEventListener("click", (event) => { if (event.target === voucherDialog) voucherDialog.close(); });
+  inviteDialog.querySelector("#closeInviteDialog").addEventListener("click", () => inviteDialog.close());
+  inviteDialog.addEventListener("click", (event) => { if (event.target === inviteDialog) inviteDialog.close(); });
+  invitePasswordDialog.querySelector("#cancelInviteConfirmation").addEventListener("click", () => invitePasswordDialog.close());
+  invitePasswordDialog.addEventListener("click", (event) => { if (event.target === invitePasswordDialog) invitePasswordDialog.close(); });
+  inviteAddButton.addEventListener("click", () => {
+    if (!selectedInviteCustomer || inviteRequestPending) return;
+    invitePasswordDialog.querySelector("#invitePasswordDescription").textContent = `You are about to invite ${selectedInviteCustomer.name} to become an admin. They will need to accept by email.`;
+    invitePasswordError.textContent = "";
+    inviteAdminPassword.value = "";
+    if (!invitePasswordDialog.open) invitePasswordDialog.showModal();
+    inviteAdminPassword.focus();
+  });
+  inviteCustomerList.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-invite-customer-id]");
+    if (!option) return;
+    selectedInviteCustomer = { id: option.dataset.inviteCustomerId, name: option.textContent.trim() };
+    inviteCustomerList.querySelectorAll("[data-invite-customer-id]").forEach((item) => {
+      item.classList.toggle("is-selected", item === option);
+      item.setAttribute("aria-selected", String(item === option));
+    });
+    inviteAddButton.disabled = false;
+  });
+  confirmInviteButton.addEventListener("click", sendAdminInvitation);
+  invitePasswordDialog.querySelector("#inviteAdminPassword").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      sendAdminInvitation();
+    }
+  });
   voucherPickerList.addEventListener("change", (event) => {
     if (!event.target.matches('input[name="voucherChoice"]')) return;
     selectedVoucherId = Number(event.target.value);
@@ -144,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  if (inviteBtn) inviteBtn.addEventListener("click", () => recordManageAction("invite_opened"));
+  if (inviteBtn) inviteBtn.addEventListener("click", openInvitePicker);
   loadAccounts();
 
   async function loadAccounts() {
@@ -274,6 +321,68 @@ document.addEventListener("DOMContentLoaded", () => {
       `).join("");
     } catch (error) {
       voucherPickerMessage.textContent = error.message;
+    }
+  }
+
+  async function openInvitePicker() {
+    selectedInviteCustomer = null;
+    inviteAddButton.disabled = true;
+    invitePickerMessage.textContent = "Loading enabled customers…";
+    inviteCustomerList.replaceChildren();
+    if (!inviteDialog.open) inviteDialog.showModal();
+    try {
+      const response = await fetch("/api/admin/accounts/invite-candidates", { credentials: "same-origin" });
+      const customers = await response.json();
+      if (!response.ok) throw new Error(customers.error || "Unable to load enabled customers");
+      if (!customers.length) {
+        invitePickerMessage.textContent = "There are no enabled customers available to invite.";
+        return;
+      }
+      invitePickerMessage.textContent = "Select a customer, then choose Add +.";
+      inviteCustomerList.innerHTML = customers.map((customer) => {
+        const name = `${customer.first_name || ""} ${customer.last_name || ""}`.trim() || `Customer #${customer.accountId}`;
+        return `<button class="invite-customer-option" type="button" role="option" aria-selected="false" data-invite-customer-id="${escapeHtml(customer.accountId)}">${escapeHtml(name)}</button>`;
+      }).join("");
+    } catch (error) {
+      invitePickerMessage.textContent = error.message;
+    }
+  }
+
+  async function sendAdminInvitation() {
+    if (inviteRequestPending || !selectedInviteCustomer) return;
+    const password = inviteAdminPassword.value;
+    if (!password) {
+      invitePasswordError.textContent = "Enter your admin password to continue.";
+      inviteAdminPassword.focus();
+      return;
+    }
+
+    inviteRequestPending = true;
+    confirmInviteButton.disabled = true;
+    confirmInviteButton.textContent = "Sending…";
+    invitePasswordError.textContent = "";
+    try {
+      const response = await fetch("/api/admin/accounts/invitations", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: selectedInviteCustomer.id, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to send invitation");
+      invitePasswordDialog.close();
+      invitePickerMessage.textContent = `Invitation sent to ${selectedInviteCustomer.name}. It will be added to Admin only if they accept.`;
+      inviteCustomerList.querySelectorAll("[data-invite-customer-id]").forEach((item) => {
+        if (item.dataset.inviteCustomerId === String(selectedInviteCustomer.id)) item.remove();
+      });
+      selectedInviteCustomer = null;
+      inviteAddButton.disabled = true;
+    } catch (error) {
+      invitePasswordError.textContent = error.message;
+    } finally {
+      inviteRequestPending = false;
+      confirmInviteButton.disabled = false;
+      confirmInviteButton.textContent = "Confirm";
     }
   }
 

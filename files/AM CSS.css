@@ -358,6 +358,25 @@
 .voucher-picker-message { min-height: 1.2em; margin: 12px 0 0; color: var(--text-secondary); font-size: 0.88rem; }
 .account-voucher-dialog .account-dialog__actions { flex: 0 0 auto; margin-top: 12px; }
 
+.account-invite-dialog { width: min(560px, calc(100vw - 32px)); max-width: 560px; }
+.invite-dialog__header-actions { display: flex; align-items: center; gap: 10px; }
+.invite-add-button { min-height: 36px; padding: 7px 12px; border: 1px solid var(--gold); border-radius: 9px; background: var(--gold); color: var(--bg); font: inherit; font-weight: 700; white-space: nowrap; }
+.invite-add-button:disabled { cursor: not-allowed; opacity: .45; }
+.invite-add-button:not(:disabled):hover { background: var(--gold-dim); }
+.invite-customer-list { display: grid; max-height: min(56vh, 480px); gap: 8px; overflow-y: auto; padding: 2px 6px 2px 2px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--gold-dim) var(--card-bg); }
+.invite-customer-option { width: 100%; padding: 13px 15px; border: 1px solid var(--border); border-radius: 9px; background: var(--card-bg); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
+.invite-customer-option:hover { border-color: var(--gold-dim); }
+.invite-customer-option.is-selected { border-color: var(--gold); background: rgba(217, 164, 65, .12); color: var(--gold); }
+.invite-password-dialog { width: min(440px, calc(100vw - 32px)); max-width: 440px; }
+.invite-security-icon { background: rgba(217, 164, 65, .14); color: var(--gold); }
+.invite-password-dialog .account-dialog__body { text-align: left; }
+.invite-password-dialog h2 { text-align: center; }
+.invite-password-dialog .account-dialog__body > p:not(.account-dialog__error) { text-align: center; }
+.invite-password-label { display: block; margin: 18px 0 7px; color: var(--text-secondary); font-size: .88rem; }
+.invite-password-input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; outline: none; background: var(--card-bg); color: var(--text-primary); font: inherit; }
+.invite-password-input:focus { border-color: var(--gold); }
+.invite-password-error { min-height: 1.2em; margin: 8px 0 14px; }
+
 @media (max-width: 900px) {
   .account-management-document .CaravanDesk { height: 100vh; }
   .account-page-content {
@@ -377,4 +396,6 @@
   .account-detail-section dl { grid-template-columns: 1fr; }
   .account-dialog__actions { flex-direction: column-reverse; }
   .account-dialog__actions button { width: 100%; }
+  .invite-dialog__header-actions { gap: 6px; }
+  .invite-add-button { padding-inline: 9px; }
 }
