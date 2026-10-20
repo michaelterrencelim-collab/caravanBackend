@@ -135,6 +135,81 @@ router.get("/accounts", async (_req, res) => {
   }
 });
 
+router.get("/accounts/customer/:accountId/details", async (req, res) => {
+  const customerId = Number(req.params.accountId);
+  if (!Number.isInteger(customerId) || customerId < 1)
+    return res.status(400).json({ error: "Invalid customer ID" });
+  try {
+    const [customerResult, addressesResult, vouchersResult, ordersResult] = await Promise.all([
+      db.execute({
+        sql: `SELECT Customer_id AS accountId, first_name, last_name, Cus_email AS email,
+                     Cus_phone AS phone, Cus_birthdate AS birthdate, Status AS account_status
+              FROM Customer WHERE Customer_id = ?`,
+        args: [customerId],
+      }),
+      db.execute({
+        sql: `SELECT Address_id, Street_address, City, Zip_code
+              FROM Address WHERE Customer_id = ? ORDER BY Address_id`,
+        args: [customerId],
+      }),
+      db.execute({
+        sql: `SELECT v.Voucher_id, v.Voucher_name, v.Voucher_desc, v.discount, cv.Voucher_status
+              FROM Customer_vouchers cv
+              JOIN Vouchers v ON v.Voucher_id = cv.Voucher_id
+              WHERE cv.Customer_id = ? ORDER BY v.Voucher_id`,
+        args: [customerId],
+      }),
+      db.execute({
+        sql: `SELECT o.Order_id, o.Order_date, o.Total_cost, o.Shipping_fee, o.Discount,
+                     os.Order_status, a.Street_address, a.City, a.Zip_code,
+                     oi.Order_item_id, oi.Product_id, p.Prod_name, oi.Quantity, oi.Unit_price, oi.Product_Size
+              FROM Orders o
+              LEFT JOIN Order_status os ON os.Status_id = o.Status_id
+              LEFT JOIN Address a ON a.Address_id = o.Address_id
+              LEFT JOIN Order_items oi ON oi.Order_id = o.Order_id
+              LEFT JOIN Product p ON p.Product_id = oi.Product_id
+              WHERE o.Customer_id = ?
+              ORDER BY o.Order_date DESC, o.Order_id DESC, oi.Order_item_id`,
+        args: [customerId],
+      }),
+    ]);
+
+    if (!customerResult.rows.length) return res.status(404).json({ error: "Customer not found" });
+    const orders = new Map();
+    for (const row of ordersResult.rows) {
+      if (!orders.has(Number(row.Order_id))) {
+        orders.set(Number(row.Order_id), {
+          order_id: Number(row.Order_id),
+          order_date: row.Order_date,
+          total_cost: Number(row.Total_cost || 0),
+          shipping_fee: Number(row.Shipping_fee || 0),
+          discount: Number(row.Discount || 0),
+          order_status: row.Order_status || "Unknown",
+          address: [row.Street_address, row.City, row.Zip_code].filter(Boolean).join(", ") || null,
+          items: [],
+        });
+      }
+      if (row.Order_item_id != null) {
+        orders.get(Number(row.Order_id)).items.push({
+          product_id: Number(row.Product_id),
+          product_name: row.Prod_name || `Product ${row.Product_id}`,
+          quantity: Number(row.Quantity || 0),
+          unit_price: Number(row.Unit_price || 0),
+          product_size: row.Product_Size || null,
+        });
+      }
+    }
+    res.json({
+      customer: customerResult.rows[0],
+      addresses: addressesResult.rows,
+      vouchers: vouchersResult.rows,
+      orders: [...orders.values()],
+    });
+  } catch (error) {
+    fail(res, error, "Unable to retrieve customer details");
+  }
+});
+
 router.put("/accounts/:kind/:accountId/status", async (req, res) => {
   const { kind } = req.params;
   const id = Number(req.params.accountId);
@@ -143,12 +218,10 @@ router.put("/accounts/:kind/:accountId/status", async (req, res) => {
     kind === "customer" ? "Customer" : kind === "admin" ? "Admin" : null;
   const idColumn = kind === "customer" ? "Customer_id" : "Admin_id";
   const statusColumn = kind === "customer" ? "Status" : "Account_status";
-  if (
-    !table ||
-    !Number.isInteger(id) ||
-    id < 1 ||
-    !["active", "suspended", "pending"].includes(status.toLowerCase())
-  )
+  const allowedStatuses = kind === "customer"
+    ? ["enabled", "disabled"]
+    : ["active", "suspended", "pending", "enabled", "disabled"];
+  if (!table || !Number.isInteger(id) || id < 1 || !allowedStatuses.includes(status.toLowerCase()))
     return res
       .status(400)
       .json({ error: "Invalid account kind, ID, or status" });
