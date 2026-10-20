@@ -4,6 +4,7 @@ const { checkAuth } = require("../../imports/token");
 const { logAudit } = require("../Audit/AuditImport");
 const { sendAdminInvitation } = require("../../imports/email");
 const { ensureAdminInvitationTable, createInvitationToken, hashInvitationToken } = require("../../imports/adminInvitations");
+const { refreshAdminSession } = require("../../imports/adminSession");
 
 const router = express.Router();
 router.customPath = "/api/admin";
@@ -16,6 +17,17 @@ const fail = (res, error, message) => {
 };
 
 const DASHBOARD_LOW_STOCK_THRESHOLD = 20;
+
+router.post("/session/heartbeat", async (req, res) => {
+  try {
+    const renewed = await refreshAdminSession(Number(req.user.adminId), String(req.user.sid || ""));
+    if (!renewed) return res.status(401).json({ error: "Admin session expired. Please sign in again." });
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ active: true });
+  } catch (error) {
+    fail(res, error, "Unable to refresh admin session");
+  }
+});
 
 router.get("/dashboard", async (req, res) => {
   try {

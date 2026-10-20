@@ -1,4 +1,21 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const heartbeatAdminSession = async () => {
+    try {
+      const response = await fetch("/api/admin/session/heartbeat", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (response.status === 401 || response.status === 403) {
+        window.location.replace("/login");
+      }
+    } catch (error) {
+      console.warn("Admin session heartbeat failed; the session will expire if this continues.", error);
+    }
+  };
+  heartbeatAdminSession();
+  window.setInterval(heartbeatAdminSession, 60 * 1000);
+
   const navLinks = document.querySelectorAll(".nav-link");
   const bellBtn = document.getElementById("bellBtn");
   const bellDot = document.getElementById("bellDot");

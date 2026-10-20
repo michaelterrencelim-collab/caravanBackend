@@ -5,7 +5,7 @@ const db = require("../../imports/database");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { checkAuth } = require("../../imports/token");
-const { claimAdminSession, releaseAdminSession, clearAdminSession } = require("../../imports/adminSession");
+const { claimAdminSession, getAdminSessionExpiry, releaseAdminSession, clearAdminSession } = require("../../imports/adminSession");
 const { logAudit } = require("../Audit/AuditImport");
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -45,7 +45,7 @@ app.post("/login", async (req, res) => {
     const user = admins[0];
 
     const sessionId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = getAdminSessionExpiry();
     const token = jwt.sign(
       {
         adminId: user.Admin_id,

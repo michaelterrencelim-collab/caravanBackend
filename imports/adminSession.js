@@ -1,16 +1,24 @@
 const db = require("./database");
+const ADMIN_SESSION_LEASE_MS = 5 * 60 * 1000;
 
 let tableReady;
 
 async function ensureSessionTable() {
   if (!tableReady) {
-    tableReady = db.execute(`
-      CREATE TABLE IF NOT EXISTS Admin_sessions (
-        Admin_id INTEGER PRIMARY KEY,
-        Session_id TEXT NOT NULL,
-        Expires_at TEXT NOT NULL
-      )
-    `).catch((error) => {
+    tableReady = (async () => {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS Admin_sessions (
+          Admin_id INTEGER PRIMARY KEY,
+          Session_id TEXT NOT NULL,
+          Expires_at TEXT NOT NULL
+        )
+      `);
+      await db.execute(`
+        UPDATE Admin_sessions
+        SET Expires_at = datetime('now', '+5 minutes')
+        WHERE julianday(Expires_at) > julianday('now', '+5 minutes')
+      `);
+    })().catch((error) => {
       tableReady = null;
       throw error;
     });
@@ -28,6 +36,21 @@ async function claimAdminSession(adminId, sessionId, expiresAt) {
             Expires_at = excluded.Expires_at
           WHERE julianday(Admin_sessions.Expires_at) <= julianday('now')`,
     args: [adminId, sessionId, expiresAt],
+  });
+  return Number(result.rowsAffected || 0) > 0;
+}
+
+function getAdminSessionExpiry() {
+  return new Date(Date.now() + ADMIN_SESSION_LEASE_MS).toISOString();
+}
+
+async function refreshAdminSession(adminId, sessionId) {
+  if (!adminId || !sessionId) return false;
+  await ensureSessionTable();
+  const result = await db.execute({
+    sql: `UPDATE Admin_sessions SET Expires_at = ?
+          WHERE Admin_id = ? AND Session_id = ? AND julianday(Expires_at) > julianday('now')`,
+    args: [getAdminSessionExpiry(), adminId, sessionId],
   });
   return Number(result.rowsAffected || 0) > 0;
 }
@@ -62,4 +85,4 @@ async function clearAdminSession(adminId) {
   return Number(result.rowsAffected || 0);
 }
 
-module.exports = { claimAdminSession, isCurrentAdminSession, releaseAdminSession, clearAdminSession };
+module.exports = { claimAdminSession, getAdminSessionExpiry, refreshAdminSession, isCurrentAdminSession, releaseAdminSession, clearAdminSession };
