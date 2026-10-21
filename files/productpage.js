@@ -81,7 +81,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
             }
 
-            console.log("BUNDLE RESPONSE:", bundle);
 
             allProducts = products;
             currentItem = bundle;
@@ -115,7 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
             hideLoader();
         })
         .catch(error => {
-            console.error("Error loading bundle:", error);
 
             const productContainer = document.querySelector(".product-container");
 
@@ -161,7 +159,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 : productData;
                 
             const products = await productsResponse.json();
-            console.log("PRODUCT RESPONSE:", product);
 
             allProducts = products;
             currentItem = product;
@@ -192,7 +189,6 @@ document.addEventListener("DOMContentLoaded", () => {
             renderRandomProducts(product, products);
         })
         .catch(error => {
-            console.error("Error loading product:", error);
 
             document.querySelector(".product-container").innerHTML =
                 "<p>Unable to load this product.</p>";
@@ -444,7 +440,6 @@ async function updateNavbarLogin(){
 
     const response = await fetch("/api/isLoggedIn");
 
-    console.log(response);
         if(!response.ok){
     document.getElementById("accountButton").innerHTML = `
         <a class="nav-link" href="/login">Login</a>
@@ -486,7 +481,6 @@ async function addtoCart() {
 
     } catch (error) {
 
-        console.error("Login check failed:", error);
 
         login_required_modal.style.visibility = "visible";
         login_required_modal.style.opacity = "1";
@@ -512,7 +506,6 @@ function goToReviews() {
     const itemId = productId || bundleId;
 
     if (!itemId) {
-        console.error("Unable to identify item.");
         return;
     }
 
@@ -583,10 +576,6 @@ async function addToWishlist() {
             const responseText =
                 await response.text();
 
-            console.error(
-                "Non-JSON wishlist response:",
-                responseText
-            );
 
             if (
                 response.status === 401 ||
@@ -634,10 +623,6 @@ async function addToWishlist() {
         );
 
     } catch (error) {
-        console.error(
-            "Wishlist error:",
-            error
-        );
 
         showWishlistModal(
             "WISHLIST ERROR",
@@ -723,7 +708,6 @@ function addtocart_confirm() {
     addtocart_modal.style.opacity = "0";
 
     if (!itemId) {
-        console.error("No valid product or bundle ID found.");
         showCartErrorModal("Unable to identify this item.");
 
         return;
@@ -797,10 +781,6 @@ function addtocart_confirm() {
         JSON.stringify(cart)
     );
 
-    console.log(
-        "Cart saved to localStorage:",
-        cart
-    );
 
     showSuccessModal();
 }

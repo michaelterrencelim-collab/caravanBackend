@@ -135,7 +135,6 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const data = await api(`/fetchAuditLogs?${buildQuery({ page: state.page, limit: PAGE_SIZE })}`);
       if (requestId !== requestCounter) return; // a newer request replaced this one
-      console.log("AUDIT RESPONSE:", data);
 
       state.totalPages = data.totalPages;
       if (state.page > data.totalPages) {
@@ -147,7 +146,6 @@ document.addEventListener("DOMContentLoaded", () => {
       updatePager();
     } catch (error) {
       if (requestId !== requestCounter) return;
-      console.error("Error loading audit trail:", error);
       showMessage(
         error.status === 401 || error.status === 403
           ? `You are not signed in as an admin (${error.status}).`

@@ -99,7 +99,6 @@ async function updateNavbarLogin(){
 
       const response = await fetch("/api/isLoggedIn");
 
-console.log(response);
     if(!response.ok){
 document.getElementById("accountButton").innerHTML = `
     <a class="nav-link" href="/login">Login</a>
@@ -479,22 +478,12 @@ fetch("/api/fetchProducts")
         renderBundles();
         hideContentLoader();
 
-        console.log(
-            `Products: ${products.length}`
-        );
 
-        console.log(
-            `Bundles: ${bundles.length}`
-        );
 
     })
     .catch(error => {
 
         hideContentLoader();
-        console.error(
-            "Error loading items:",
-            error
-        );
 
     });
 
@@ -520,11 +509,9 @@ document.querySelectorAll(".subcategory").forEach(subcategory => {
         if (currentTab === "products") {
             if (categoryName === "All Products") {
                 selectedCategory = "";
-                console.log("selected category: " + categoryName);
             }
             else {
                 selectedCategory = categoryName;
-                console.log("selected category: " + categoryName);
             }
 
             // Highlight selected category

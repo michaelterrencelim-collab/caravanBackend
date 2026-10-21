@@ -34,7 +34,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         await loadReviewSummary();
         await loadReviews();
     } catch (error) {
-        console.error("Failed to initialise review page:", error);
     } finally {
         hideLoader();
     }
@@ -73,7 +72,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
     } catch(error) {
-        console.error("Navbar login error:", error);
         const accountButton = document.getElementById("accountButton");
 
         if (accountButton) {
@@ -110,7 +108,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         document.getElementById("productDescription").textContent = product.product_desc;
     } catch(error) {
-        console.error("Failed to load product:", error);
     }
   }
 
@@ -121,9 +118,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
     if (!myReviewSection) {
-        console.error(
-            "myReviewSection is missing from Review.html"
-        );
 
         return;
     }
@@ -151,10 +145,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             const responseText =
                 await response.text();
 
-            console.error(
-                "Non-JSON myReview response:",
-                responseText
-            );
 
             return;
         }
@@ -171,16 +161,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        console.log(
-            "Logged-in customer's review:",
-            review
-        );
-
         if (!response.ok) {
-            console.error(
-                review.error ||
-                "Unable to retrieve customer review"
-            );
             return;
         }
 
@@ -282,10 +263,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
     } catch (error) {
-        console.error(
-            "Failed to load customer review:",
-            error
-        );
     }
   }
 
@@ -298,16 +275,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
 
           const reviews = await response.json();
-
-          console.log(
-              "ALL REVIEWS:",
-              reviews
-          );
-
-          console.log(
-              "CURRENT USER REVIEW:",
-              currentUserReview
-          );
 
           /*
           * Remove the current user's review
@@ -322,10 +289,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           );
           renderReviewCards(otherReviews);
       } catch (error) {
-          console.error(
-              "Failed to load reviews:",
-              error
-          );
       }
   }
 
@@ -357,7 +320,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderAverageStars(average);
 
     } catch(error) {
-        console.error("Review summary error: ",error);
     }
   }
 
@@ -593,11 +555,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.addEventListener("click", event => {
         if (event.target.id === "editReviewBtn") {
-            console.log(
-                "Edit button clicked",
-                currentUserReview
-            );
-
             if (!currentUserReview) {
                 return;
             }
@@ -753,7 +710,6 @@ confirmDeleteReviewBtn.addEventListener("click", async () => {
         alert(result.message || "Review deleted successfully.");
 
     } catch (error) {
-        console.error("Delete review error:", error);
         alert(error.message || "Failed to delete review.");
 
     } finally {
@@ -887,10 +843,6 @@ reviewForm.addEventListener("submit", async event => {
             const responseText =
                 await response.text();
 
-            console.error(
-                "Non-JSON add-review response:",
-                responseText
-            );
 
             if (
                 response.status === 401 ||
@@ -922,11 +874,6 @@ reviewForm.addEventListener("submit", async event => {
                 "Unable to submit review."
             );
         }
-
-        console.log(
-            "Review successfully saved:",
-            result
-        );
 
         reviewForm.reset();
 
@@ -960,10 +907,6 @@ reviewForm.addEventListener("submit", async event => {
         }
 
     } catch (error) {
-        console.error(
-            "Failed to submit review:",
-            error
-        );
 
         alert(
             error.message ||
@@ -1039,10 +982,6 @@ editReviewForm.addEventListener(
         }
 
         catch(error) {
-            console.error(
-                "Update review error:",
-                error
-            );
             alert(error.message);
         
         }finally {

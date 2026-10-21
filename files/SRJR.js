@@ -52,10 +52,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   addReportBtn.addEventListener("click", () => {
-    console.log("Add a new report clicked");
   });
 
   exportBtn.addEventListener("click", () => {
-    console.log("Export clicked");
   });
 });

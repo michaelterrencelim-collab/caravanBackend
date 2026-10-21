@@ -252,7 +252,6 @@ registerForm.addEventListener("submit", async function (e) {
   });
 
   const data = await response.json();
-  console.log(data);
 
   if (data.error) {
     showError(data.error);

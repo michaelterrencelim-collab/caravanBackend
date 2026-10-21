@@ -13,13 +13,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".st-add-option").forEach((link) => {
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      console.log(`${link.dataset.action} clicked`);
     });
   });
 
   if (saveBtn) {
     saveBtn.addEventListener("click", () => {
-      console.log("Settings saved");
     });
   }
-}); 
+});

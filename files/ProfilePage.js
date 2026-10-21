@@ -82,13 +82,11 @@ document.addEventListener("DOMContentLoaded", () => {
           const response = await fetch("/api/profile");
 
           if (!response.ok) {
-              console.error("Failed to load profile:", response.status);
               return;
           }
 
           const data = await response.json();
 
-          console.log("Profile information:", data);
 
           document.getElementById("userEmail").value = data.email || "";
           document.getElementById("userFirstName").value = data.firstName || "";
@@ -96,7 +94,6 @@ document.addEventListener("DOMContentLoaded", () => {
           document.getElementById("userBirthdate").value = data.birthdate || "";
           document.querySelector(".user-name").textContent = `${data.firstName || ""} ${data.lastName || ""}`.trim();
       } catch (error) {
-          console.error("Error loading profile:", error);
       }
   }
 
@@ -160,7 +157,6 @@ document.addEventListener("DOMContentLoaded", () => {
           password: document.getElementById("userPassword").value
       };
 
-      console.log("Saving profile...", payload);
       
       //PUTS new items inside db (replacing old)
       try {
@@ -176,7 +172,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const result = await response.json();
 
-          console.log(result);
           hideLoader();
 
           if (!response.ok) {
@@ -186,7 +181,6 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
           hideLoader();
 
-          console.error("Save error:", err);
 
           confirmSaveBtn.disabled = false;
           confirmSaveBtn.textContent = "Save";
@@ -389,7 +383,6 @@ if (addressForm) {
 
         } catch (error) {
             hideLoader();
-            console.error("Save address error:", error);
 
             alert(error.message || "Failed to save address.");
 
@@ -427,10 +420,6 @@ if (addressForm) {
 
         } catch (error) {
             hideLoader();
-            console.error(
-                "Load addresses error:",
-                error
-            );
         }
     }
 
@@ -448,7 +437,6 @@ if (addressForm) {
             }
             renderVouchers(result);
         } catch (error) {
-            console.error("Voucher load error:", error);
         }
     }
 
@@ -590,10 +578,6 @@ if (addressForm) {
 
         } catch (error) {
 
-            console.error(
-                "Wishlist load error:",
-                error
-            );
 
         }
 
@@ -616,10 +600,6 @@ if (addressForm) {
 
         } catch (error) {
 
-            console.error(
-                "Wishlist delete error:",
-                error
-            );
 
         }
 
@@ -802,10 +782,6 @@ if (addressForm) {
                 await loadAddresses();
             } catch (error) {
                 hideLoader();
-                console.error(
-                    "Update address error:",
-                    error
-                );
                 alert(
                     error.message ||
                     "Failed to update address."
@@ -873,7 +849,6 @@ if (addressForm) {
                 if (!contentType.includes("application/json")) {
                     const responseText = await response.text();
 
-                    console.error("Invalid server response:", responseText);
                     throw new Error("The server returned an invalid response");
                 }
 
@@ -893,10 +868,6 @@ if (addressForm) {
 
             } catch (error) {
                 hideLoader();
-                console.error(
-                    "Delete address error:",
-                    error
-                );
 
                 alert(
                     error.message ||

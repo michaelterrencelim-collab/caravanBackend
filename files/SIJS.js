@@ -255,7 +255,6 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const data = await api(`/fetchStocks?${filterQuery({ page: state.page, limit: PAGE_SIZE })}`);
       if (requestId !== requestCounter) return; // a newer request replaced this one
-      console.log("STOCKS RESPONSE:", data);
 
       state.totalPages = data.totalPages;
       renderSubtitle(data.summary);
@@ -269,7 +268,6 @@ document.addEventListener("DOMContentLoaded", () => {
       updatePager();
     } catch (error) {
       if (requestId !== requestCounter) return;
-      console.error("Error loading stocks:", error);
       colspanMessage(
         error.status === 401 || error.status === 403
           ? `You are not signed in as an admin (${error.status}).`

@@ -10,7 +10,6 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.replace("/login");
       }
     } catch (error) {
-      console.warn("Admin session heartbeat failed; the session will expire if this continues.", error);
     }
   };
   heartbeatAdminSession();
@@ -61,7 +60,6 @@ document.addEventListener("DOMContentLoaded", () => {
   navLinks.forEach((link) => link.addEventListener("click", (event) => {
     if (link.getAttribute("href") === "#") {
       event.preventDefault();
-      console.log(`${link.dataset.page} hasn't been built yet.`);
     }
   }));
 
@@ -100,7 +98,6 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
       } catch (error) {
-        console.error("Unable to record admin logout:", error);
       }
       window.location.assign("/login");
     });

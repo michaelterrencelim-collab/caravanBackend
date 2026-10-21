@@ -104,10 +104,6 @@ document.addEventListener("DOMContentLoaded", () => {
             ) || null;
 
 
-            console.log(
-                "Selected address:",
-                selectedAddress
-            );
         }
     );
 
@@ -144,7 +140,6 @@ async function updateNavbarLogin(){
 
     const response = await fetch("/api/isLoggedIn");
 
-    console.log(response);
         if(!response.ok){
     document.getElementById("accountButton").innerHTML = `
         <a class="nav-link" href="/login">Login</a>
@@ -389,7 +384,6 @@ async function checkout_Yes() {
                         processingState.style.display = "none";
                         successState.style.display = "block";
                     } catch (error) {
-                        console.error("PayPal checkout failed:", error);
                         modal.style.display = "none";
                         alert(error.message || "PayPal payment could not be completed.");
                     }
@@ -398,7 +392,6 @@ async function checkout_Yes() {
                     modal.style.display = "none";
                 },
                 onError: (error) => {
-                    console.error("PayPal approval failed:", error);
                     modal.style.display = "none";
                     alert("PayPal could not process the payment. Please try again.");
                 }
@@ -419,8 +412,6 @@ async function checkout_Yes() {
 
         const result = await response.json();
 
-        //Console log of the TEST_MODE
-        console.log("Checkout Response:", result);
 
         if (!response.ok) {
             throw new Error(
@@ -430,10 +421,6 @@ async function checkout_Yes() {
         }
 
         if (result.testMode) {
-            console.log(
-                "TEST MODE CHECKOUT PREVIEW:",
-                JSON.stringify(result.preview, null, 4)
-            );
 
             processingState.style.display = "none";
             successState.style.display = "block";
@@ -441,7 +428,6 @@ async function checkout_Yes() {
             return;
         }
 
-        console.log("Order placed:", result);
 
         /*
          * Only clear the cart after the API
@@ -495,7 +481,6 @@ async function checkout_Yes() {
         successState.style.display = "block";
 
     } catch (error) {
-        console.error("Checkout failed:",error);
         modal.style.display = "none";
         alert(error.message || "Failed to process order.");
     } finally {
@@ -546,7 +531,6 @@ async function loadCartItems() {
         displayCartItems();
 
     } catch (error) {
-        console.error("Error loading cart items:", error);
         document.querySelector(".cart-items").innerHTML = "<p>Unable to load cart items.</p>";
     } finally {
         hideLoader();
@@ -556,18 +540,11 @@ async function loadCartItems() {
 // Loads User's available vouchers
 async function loadVouchers() {
     try {
-        console.log("Loading vouchers...");
         const response = await fetch("/vouchers/me");
-        console.log("status:", response.status);
         const data = await response.json();
-        console.log("Data:", data);
         vouchers = data;
         renderVoucherDropdown();
     } catch (error) {
-        console.error(
-            "Voucher load error:",
-            error
-        );
     }
 }
 
@@ -585,7 +562,6 @@ async function loadShippingOptions() {
         renderShippingDropdown();
 
     } catch(error) {
-        console.error("Shipping load error: ", error);
     }
 }
 
@@ -594,9 +570,6 @@ async function loadAddresses() {
     try {
         const response = await fetch("/api/addresses");
         if (!response.ok) {
-            console.error(
-                "Failed to load addresses"
-            );
             return;
         }
 
@@ -604,7 +577,6 @@ async function loadAddresses() {
         renderAddressDropdown();
 
     } catch (error) {
-        console.error("Address load error: ", error);
     }
 }
 

@@ -170,7 +170,6 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const data = await api(`/fetchOrders?${filterQuery({ page: state.page, limit: PAGE_SIZE })}`);
       if (requestId !== requestCounter) return; // a newer request replaced this one
-      console.log("ORDERS RESPONSE:", data);
 
       state.totalPages = data.totalPages;
       pageSubtitle.textContent = `${baseSubtitle} · ${data.total} ${data.total === 1 ? "order" : "orders"}`;
@@ -184,7 +183,6 @@ document.addEventListener("DOMContentLoaded", () => {
       updatePager();
     } catch (error) {
       if (requestId !== requestCounter) return;
-      console.error("Error loading orders:", error);
       pageSubtitle.textContent = baseSubtitle;
       messageRow(
         error.status === 401 || error.status === 403
@@ -204,10 +202,8 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadStatuses() {
     try {
       statuses = await api("/fetchOrderStatuses");
-      console.log("STATUSES RESPONSE:", statuses);
       fillStatusFilter();
     } catch (error) {
-      console.error("Error loading order statuses:", error);
     }
   }
 

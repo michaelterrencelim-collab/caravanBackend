@@ -267,7 +267,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (action.classList.contains("action-give-voucher")) {
       openVoucherPicker(row.dataset.accountId, name);
     } else if (action.classList.contains("action-message")) {
-      console.log("Message account:", name);
     }
   }));
 
@@ -468,7 +467,6 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ action, ...(accountId ? { accountId } : {}) }),
       });
     } catch (error) {
-      console.error("Unable to record account action:", error);
     }
   }
 });

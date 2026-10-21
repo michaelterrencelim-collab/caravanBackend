@@ -204,7 +204,6 @@ async function loadOrders() {
         renderOrders(ordersData);
     } catch (error) {
 
-        console.error("Error loading orders:", error);
 
         container.innerHTML = `
             <div class="orderhistory-card">
@@ -302,7 +301,6 @@ async function openReceiptModal(orderId) {
         receiptModal.classList.add("active");
     } catch(error) {
         hideLoader();
-        console.error(error);
         receiptContent.innerHTML = `
             <p>
                 Failed to load order details.
@@ -314,7 +312,6 @@ async function openReceiptModal(orderId) {
 
 async function submitRefundRequest(event) {
     event.preventDefault();
-    console.log("Submitting refund request...");
     const reason = document.getElementById("refundReason").value.trim();
 
     if (!selectedRefundOrderId) {
@@ -353,7 +350,6 @@ async function submitRefundRequest(event) {
 
     } catch (error) {
         hideLoader();
-        console.error(error);
         alert("An unexpected error occurred while submitting the refund request.");
     }
 }

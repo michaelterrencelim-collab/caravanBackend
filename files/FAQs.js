@@ -3,7 +3,6 @@ async function updateNavbarLogin(){
 
     const response = await fetch("/api/isLoggedIn");
 
-    console.log(response);
         if(!response.ok){
     document.getElementById("accountButton").innerHTML = `
         <a class="nav-link" href="/login">Login</a>
