@@ -15,8 +15,6 @@ app.customPath = "/api";
 
 app.post("/login", async (req, res) => {
   try {
-    console.log("A");
-
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -43,6 +41,12 @@ app.post("/login", async (req, res) => {
     }
 
     const user = admins[0];
+    const accountStatus = String(user.Account_status || "").trim().toLowerCase();
+    if (!["enabled", "active"].includes(accountStatus)) {
+      return res.status(403).json({
+        error: "This admin account is suspended or not enabled. Contact a Super Admin for help.",
+      });
+    }
 
     const sessionId = crypto.randomUUID();
     const expiresAt = getAdminSessionExpiry();

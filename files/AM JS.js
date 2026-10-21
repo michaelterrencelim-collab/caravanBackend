@@ -135,7 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (statusFilter) {
       const statuses = tabName === "customer"
         ? [["enabled", "Enabled"], ["disabled", "Disabled"]]
-        : [["active", "Active"], ["suspended", "Suspended"], ["disabled", "Disabled"], ["pending", "Pending"]];
+        : [["enabled", "Enabled"], ["suspended", "Suspended"]];
       statusFilter.innerHTML = '<option value="all">All statuses</option>' + statuses.map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
       statusFilter.value = "all";
     }
@@ -233,11 +233,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const last = account.last_name || "";
     const name = `${first} ${last}`.trim() || account.email || `Admin ${account.accountId}`;
     const status = titleCase(account.account_status);
-    const role = Number(account.role_id) === 1 ? "Super Admin" : "Admin";
+    const isSuperAdmin = Number(account.role_id) === 1;
+    const role = isSuperAdmin ? "Super Admin" : "Admin";
     const initials = `${first[0] || ""}${last[0] || ""}`.toUpperCase() || "AD";
     const roleClass = role === "Super Admin" ? "role-super-admin" : "role-admin";
     const disabled = ["suspended", "disabled"].includes(status.toLowerCase());
-    const statusAction = status.toLowerCase() === "pending" ? "" : `<button type="button" class="${disabled ? "action-activate" : "action-suspend"}">${disabled ? "Enable" : "Suspend"}</button>`;
+    const statusAction = status.toLowerCase() === "pending" || (isSuperAdmin && !disabled)
+      ? ""
+      : `<button type="button" class="${disabled ? "action-activate" : "action-suspend"}">${disabled ? "Enable" : "Suspend"}</button>`;
     return `<tr data-kind="admin" data-account-id="${escapeHtml(account.accountId)}" data-status="${statusClass(status)}"><td><div class="name-cell"><span class="avatar avatar-teal">${escapeHtml(initials)}</span><span class="name-text">${escapeHtml(name)}</span></div></td><td><span class="pill ${roleClass}">${escapeHtml(role)}</span></td><td class="mono">${escapeHtml(account.email)}</td><td><span class="pill status-${statusClass(status)}">${escapeHtml(status)}</span></td><td><div class="account-actions"><button type="button" class="action-view">View</button>${statusAction}</div></td></tr>`;
   }
 
@@ -250,7 +253,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (action.classList.contains("action-suspend") || action.classList.contains("action-activate")) {
       const nextStatus = action.classList.contains("action-suspend")
         ? (row.dataset.kind === "customer" ? "Disabled" : "Suspended")
-        : (row.dataset.kind === "customer" ? "Enabled" : "Active");
+        : "Enabled";
       pendingStatusChange = { row, status: nextStatus };
       confirmDialog.querySelector("#accountConfirmTitle").textContent = `${nextStatus === "Disabled" || nextStatus === "Suspended" ? "Disable" : "Enable"} account?`;
       confirmDialog.querySelector("#accountConfirmMessage").textContent = `Are you sure you want to ${nextStatus === "Disabled" || nextStatus === "Suspended" ? "disable" : "enable"} ${name}? The account status will change to ${nextStatus}.`;

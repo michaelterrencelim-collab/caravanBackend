@@ -4,7 +4,7 @@ const { checkAuth } = require("../../imports/token");
 const { logAudit } = require("../Audit/AuditImport");
 const { sendAdminInvitation } = require("../../imports/email");
 const { ensureAdminInvitationTable, createInvitationToken, hashInvitationToken } = require("../../imports/adminInvitations");
-const { refreshAdminSession } = require("../../imports/adminSession");
+const { refreshAdminSession, clearAdminSession } = require("../../imports/adminSession");
 
 const router = express.Router();
 router.customPath = "/api/admin";
@@ -428,6 +428,21 @@ router.post("/products/:productId/stock-adjustments", async (req, res) => {
 
 router.get("/accounts", async (_req, res) => {
   try {
+    const normalizedStatuses = await db.execute({
+      sql: `UPDATE Admin
+            SET Account_status = CASE
+              WHEN LOWER(TRIM(COALESCE(Account_status, ''))) IN ('enabled', 'active') THEN 'Enabled'
+              ELSE 'Suspended'
+            END
+            WHERE LOWER(TRIM(COALESCE(Account_status, ''))) NOT IN ('enabled', 'suspended')`,
+    });
+    if (Number(normalizedStatuses.rowsAffected || 0) > 0) {
+      await logAudit({
+        adminId: _req.user.adminId,
+        type: "admin_status_normalization",
+        description: `Normalized ${normalizedStatuses.rowsAffected} legacy admin account status value(s) to Enabled or Suspended`,
+      });
+    }
     const [customers, admins] = await Promise.all([
       db.execute({
         sql: "SELECT Customer_id AS accountId, first_name, last_name, Cus_email AS email, Status AS account_status FROM Customer ORDER BY Customer_id",
@@ -549,7 +564,8 @@ router.get("/accounts/customer/:accountId/vouchers/available", async (req, res) 
     const result = await db.execute({
       sql: `SELECT v.Voucher_id, v.Voucher_name, v.Voucher_desc, v.discount
             FROM Vouchers v
-            WHERE NOT EXISTS (
+            WHERE v.Status_id = 1
+              AND NOT EXISTS (
               SELECT 1 FROM Customer_vouchers cv
               WHERE cv.Customer_id = ? AND cv.Voucher_id = v.Voucher_id
                 AND LOWER(COALESCE(cv.Voucher_status, '')) = 'unused'
@@ -703,24 +719,40 @@ router.put("/accounts/:kind/:accountId/status", async (req, res) => {
   const statusColumn = kind === "customer" ? "Status" : "Account_status";
   const allowedStatuses = kind === "customer"
     ? ["enabled", "disabled"]
-    : ["active", "suspended", "pending", "enabled", "disabled"];
+    : ["enabled", "suspended"];
   if (!table || !Number.isInteger(id) || id < 1 || !allowedStatuses.includes(status.toLowerCase()))
     return res
       .status(400)
       .json({ error: "Invalid account kind, ID, or status" });
+  const savedStatus = kind === "customer"
+    ? (status.toLowerCase() === "enabled" ? "Enabled" : "Disabled")
+    : (status.toLowerCase() === "enabled" ? "Enabled" : "Suspended");
   try {
+    if (kind === "admin" && savedStatus === "Suspended") {
+      const roleResult = await db.execute({
+        sql: "SELECT role_id FROM Admin WHERE Admin_id = ?",
+        args: [id],
+      });
+      if (!roleResult.rows.length) return res.status(404).json({ error: "Account not found" });
+      if (Number(roleResult.rows[0].role_id) === 1) {
+        return res.status(403).json({ error: "Super Admin accounts cannot be suspended" });
+      }
+    }
     const result = await db.execute({
       sql: `UPDATE ${table} SET ${statusColumn} = ? WHERE ${idColumn} = ?`,
-      args: [status, id],
+      args: [savedStatus, id],
     });
     if (!result.rowsAffected)
       return res.status(404).json({ error: "Account not found" });
+    if (kind === "admin" && savedStatus === "Suspended") {
+      await clearAdminSession(id);
+    }
     await logAudit({
       adminId: req.user.adminId,
       type: "account_status",
-      description: `Changed ${kind} account #${id} status to ${status}`,
+      description: `Changed ${kind} account #${id} status to ${savedStatus}`,
     });
-    res.json({ accountId: id, status });
+    res.json({ accountId: id, status: savedStatus });
   } catch (error) {
     fail(res, error, "Unable to update account status");
   }

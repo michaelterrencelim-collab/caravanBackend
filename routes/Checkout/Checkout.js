@@ -234,6 +234,7 @@ router.post("/", checkAuth("user"), async (req, res) => {
                         WHERE cv.Customer_id = ?
                         AND cv.Voucher_id = ?
                         AND cv.Voucher_status = 'Unused'
+                        AND v.Status_id = 1
                     `,
                     args: [
                         customerId,

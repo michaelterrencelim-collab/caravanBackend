@@ -90,107 +90,61 @@
         <div>
           <h1 id="pageTitle">Settings and Configuration</h1>
         </div>
-        <button class="btn btn-primary" id="saveChangesBtn" type="button">Save Changes</button>
       </header>
 
-      <section class="section st-section">
-        <h2 class="section-title st-title">Currency</h2>
-        <div class="products-card st-card">
-          <div class="st-field-row">
-            <label class="st-field">
-              <span class="st-field-label">Default Currency</span>
-              <select class="st-select" id="defaultCurrency">
-                <option>PHP - Philippine Peso (&#8369;)</option>
-              </select>
-            </label>
-            <label class="st-field">
-              <span class="st-field-label">Display format</span>
-              <select class="st-select" id="displayFormat">
-                <option>&#8369;1,250.00</option>
-                <option>&#8369;1250</option>
-                <option>PHP 1,250.00</option>
-              </select>
-            </label>
-          </div>
-        </div>
-      </section>
+      <p class="st-message" id="settingsMessage" role="status" aria-live="polite"></p>
 
       <section class="section st-section">
         <div class="st-section-head">
           <h2 class="section-title st-title">Shipping Options</h2>
-          <a href="#" class="st-add-option" data-action="add-shipping">Add option +</a>
+          <button type="button" class="st-add-option" data-action="add-shipping">Add Option +</button>
         </div>
-        <div class="products-card st-card">
-          <div class="st-option-row">
-            <div class="st-option-info">
-              <p class="st-option-name">Standard Delivery</p>
-              <p class="st-option-sub">3-5 Business Days</p>
-            </div>
-            <div class="st-option-controls">
-              <span class="st-option-price">&#8369;50</span>
-              <label class="toggle">
-                <input type="checkbox" checked>
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
-            </div>
-          </div>
-          <div class="st-option-row is-disabled">
-            <div class="st-option-info">
-              <p class="st-option-name">Express Delivery</p>
-              <p class="st-option-sub">1-2 Business Days</p>
-            </div>
-            <div class="st-option-controls">
-              <span class="st-option-price">&#8369;100</span>
-              <label class="toggle">
-                <input type="checkbox">
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
-            </div>
-          </div>
-        </div>
+        <div class="products-card st-card st-option-list" id="shippingOptions" aria-live="polite"></div>
       </section>
 
       <section class="section st-section">
         <div class="st-section-head">
-          <h2 class="section-title st-title">Payment Options</h2>
-          <a href="#" class="st-add-option" data-action="add-payment">Add option +</a>
+          <h2 class="section-title st-title">Vouchers</h2>
+          <button type="button" class="st-add-option" data-action="add-voucher">Add Option +</button>
         </div>
-        <div class="products-card st-card">
-          <div class="st-option-row">
-            <div class="st-option-info">
-              <p class="st-option-name">Cash on Delivery</p>
-            </div>
-            <div class="st-option-controls">
-              <label class="toggle">
-                <input type="checkbox" checked>
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
-            </div>
-          </div>
-          <div class="st-option-row">
-            <div class="st-option-info">
-              <p class="st-option-name">E-Wallet / Online Banking</p>
-            </div>
-            <div class="st-option-controls">
-              <label class="toggle">
-                <input type="checkbox" checked>
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
-            </div>
-          </div>
-          <div class="st-option-row">
-            <div class="st-option-info">
-              <p class="st-option-name">Credit / Debit Card</p>
-            </div>
-            <div class="st-option-controls">
-              <label class="toggle">
-                <input type="checkbox" checked>
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
-            </div>
-          </div>
-        </div>
+        <div class="products-card st-card st-option-list" id="voucherOptions" aria-live="polite"></div>
       </section>
+
+      <dialog class="st-dialog" id="optionEditor" aria-labelledby="optionEditorTitle">
+        <form class="st-dialog__content" id="optionForm">
+          <header class="st-dialog__header">
+            <div>
+              <p class="st-dialog__eyebrow">Settings</p>
+              <h2 id="optionEditorTitle">Add option</h2>
+            </div>
+            <button type="button" class="st-dialog__close" data-close-editor aria-label="Close">&times;</button>
+          </header>
+          <div class="st-dialog__fields" id="optionFields"></div>
+          <p class="st-dialog__error" id="optionFormError" role="alert"></p>
+          <footer class="st-dialog__actions">
+            <button type="button" class="st-button st-button--secondary" data-close-editor>Cancel</button>
+            <button type="submit" class="st-button st-button--primary" id="optionFormSubmit">Continue</button>
+          </footer>
+        </form>
+      </dialog>
+
+      <dialog class="st-dialog st-confirm-dialog" id="optionConfirmation" aria-labelledby="optionConfirmationTitle">
+        <div class="st-dialog__content">
+          <header class="st-dialog__header">
+            <div>
+              <p class="st-dialog__eyebrow">Confirm addition</p>
+              <h2 id="optionConfirmationTitle">Add this option?</h2>
+            </div>
+            <button type="button" class="st-dialog__close" data-close-confirm aria-label="Close">&times;</button>
+          </header>
+          <p class="st-confirm-copy" id="optionConfirmationCopy"></p>
+          <p class="st-dialog__error" id="optionConfirmationError" role="alert"></p>
+          <footer class="st-dialog__actions">
+            <button type="button" class="st-button st-button--secondary" data-close-confirm>Cancel</button>
+            <button type="button" class="st-button st-button--primary" id="confirmAddOption">Confirm</button>
+          </footer>
+        </div>
+      </dialog>
 
     </div>
   </main>
