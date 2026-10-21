@@ -11,10 +11,10 @@ app.get("/fetchProducts", async (req, res) => {
 
   try {
     const params = [];
-    let whereClause = "";
+    let whereClause = "WHERE LOWER(COALESCE(p.Status, 'Shown')) = 'shown'";
 
     if (productId) {
-      whereClause = "WHERE p.product_id = ?";
+      whereClause += " AND p.product_id = ?";
       params.push(productId);
     }
 

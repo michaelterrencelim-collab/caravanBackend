@@ -47,6 +47,7 @@ router.get("/dashboard", async (req, res) => {
         sql: `SELECT product_id, Prod_name, Prod_amount
               FROM Product
               WHERE Prod_amount <= ?
+                AND LOWER(COALESCE(Status, 'Shown')) <> 'deleted'
               ORDER BY Prod_amount ASC, product_id ASC`,
         args: [DASHBOARD_LOW_STOCK_THRESHOLD],
       }),
@@ -64,20 +65,206 @@ router.get("/dashboard", async (req, res) => {
 
 router.get("/products", async (req, res) => {
   try {
-    const { search } = req.query;
+    const search = String(req.query.search || "").trim();
     const result = await db.execute({
-      sql: `SELECT p.product_id, p.Prod_name, p.Prod_amount, p.Prod_price,
-                   p.Prod_img, c.category_name
+      sql: `SELECT p.product_id, p.country_id, p.Prod_name, p.Prod_likes,
+                   p.Prod_price, p.Prod_amount, p.Prod_img, p."desc" AS product_desc,
+                   p.type_id, p.Status, t.type_name, c.country_name, cat.category_id, cat.category_name,
+                   COALESCE(review_summary.average_rating, 0) AS product_rating,
+                   COALESCE(review_summary.review_count, 0) AS review_count
             FROM Product p
+            LEFT JOIN Countries c ON c.country_id = p.country_id
+            LEFT JOIN Type t ON t.type_id = p.type_id
+            LEFT JOIN (
+              SELECT product_id, ROUND(AVG(rating), 1) AS average_rating, COUNT(*) AS review_count
+              FROM Review
+              GROUP BY product_id
+            ) review_summary ON review_summary.product_id = p.product_id
             LEFT JOIN Product_categories pc ON pc.product_id = p.product_id
-            LEFT JOIN Categories c ON c.category_id = pc.category_id
-            WHERE (? IS NULL OR p.Prod_name LIKE ?)
-            ORDER BY p.product_id`,
-      args: [search || null, search ? `%${search}%` : null],
+            LEFT JOIN Categories cat ON cat.category_id = pc.category_id
+            WHERE (? = '' OR p.Prod_name LIKE ? OR p."desc" LIKE ?)
+              AND LOWER(COALESCE(p.Status, 'Shown')) <> 'deleted'
+            ORDER BY p.product_id, cat.category_name`,
+      args: [search, `%${search}%`, `%${search}%`],
     });
-    res.json(result.rows);
+
+    const products = new Map();
+    for (const row of result.rows) {
+      const productId = Number(row.product_id);
+      if (!products.has(productId)) {
+        products.set(productId, {
+          product_id: productId,
+          country_id: Number(row.country_id),
+          product_name: row.Prod_name,
+          description: row.product_desc,
+          product_image: row.Prod_img,
+          country: row.country_name,
+          product_likes: Number(row.Prod_likes || 0),
+          product_rating: Number(row.product_rating || 0),
+          review_count: Number(row.review_count || 0),
+          product_price: Number(row.Prod_price || 0),
+          stock: Number(row.Prod_amount || 0),
+          type_id: Number(row.type_id),
+          type_name: row.type_name,
+          status: row.Status || "Shown",
+          categories: [],
+          category_ids: [],
+        });
+      }
+      if (row.category_id != null && !products.get(productId).category_ids.includes(Number(row.category_id))) {
+        products.get(productId).category_ids.push(Number(row.category_id));
+      }
+      if (row.category_name && !products.get(productId).categories.includes(row.category_name)) {
+        products.get(productId).categories.push(row.category_name);
+      }
+    }
+
+    res.json([...products.values()]);
   } catch (error) {
     fail(res, error, "Unable to retrieve products");
+  }
+});
+
+router.get("/product-options", async (_req, res) => {
+  try {
+    const [countries, types, categories] = await Promise.all([
+      db.execute({ sql: "SELECT country_id, country_name FROM Countries ORDER BY country_name" }),
+      db.execute({ sql: "SELECT type_id, type_name FROM Type ORDER BY type_id" }),
+      db.execute({ sql: "SELECT category_id, category_name FROM Categories ORDER BY category_name" }),
+    ]);
+    res.json({ countries: countries.rows, types: types.rows, categories: categories.rows });
+  } catch (error) {
+    fail(res, error, "Unable to retrieve product options");
+  }
+});
+
+router.put("/products/:productId", async (req, res) => {
+  const productId = Number(req.params.productId);
+  const countryId = Number(req.body.country_id);
+  const typeId = Number(req.body.type_id);
+  const status = String(req.body.status || "Shown");
+  const productName = typeof req.body.product_name === "string" ? req.body.product_name.trim() : "";
+  const productPrice = Number(req.body.product_price);
+  const productImage = typeof req.body.product_image === "string" ? req.body.product_image.trim() : "";
+  const description = typeof req.body.description === "string" ? req.body.description : "";
+  const categoryIds = Array.isArray(req.body.category_ids)
+    ? [...new Set(req.body.category_ids.map(Number))]
+    : [];
+
+  if (!Number.isInteger(productId) || productId < 1 || !Number.isInteger(countryId) || ![1, 2].includes(typeId))
+    return res.status(400).json({ error: "Choose a valid country and type." });
+  if (!["Shown", "Hidden"].includes(status))
+    return res.status(400).json({ error: "Product status must be Shown or Hidden." });
+  if (!productName || productName.length > 255)
+    return res.status(400).json({ error: "Product name is required and must be 255 characters or fewer." });
+  if (!Number.isFinite(productPrice) || productPrice < 0)
+    return res.status(400).json({ error: "Enter a valid non-negative price per ounce." });
+  if (!categoryIds.length || categoryIds.some((categoryId) => !Number.isInteger(categoryId) || categoryId < 1))
+    return res.status(400).json({ error: "Choose at least one valid category." });
+  if (productImage.length > 255)
+    return res.status(400).json({ error: "Image links must be 255 characters or fewer." });
+  if (productImage) {
+    try {
+      const imageUrl = new URL(productImage);
+      if (!['http:', 'https:'].includes(imageUrl.protocol)) throw new Error("Unsupported image URL protocol");
+    } catch (_) {
+      return res.status(400).json({ error: "Enter a valid HTTP or HTTPS image link." });
+    }
+  }
+
+  try {
+    const [country, type, product, selectedCategories] = await Promise.all([
+      db.execute({ sql: "SELECT country_id FROM Countries WHERE country_id = ?", args: [countryId] }),
+      db.execute({ sql: "SELECT type_id FROM Type WHERE type_id = ?", args: [typeId] }),
+      db.execute({ sql: "SELECT product_id, Prod_name FROM Product WHERE product_id = ?", args: [productId] }),
+      db.execute({
+        sql: `SELECT category_id FROM Categories WHERE category_id IN (${categoryIds.map(() => "?").join(", ")})`,
+        args: categoryIds,
+      }),
+    ]);
+    if (!country.rows.length) return res.status(400).json({ error: "Selected country was not found." });
+    if (!type.rows.length) return res.status(400).json({ error: "Selected product type was not found." });
+    if (!product.rows.length) return res.status(404).json({ error: "Product was not found." });
+    if (selectedCategories.rows.length !== categoryIds.length) return res.status(400).json({ error: "One or more selected categories were not found." });
+
+    let transaction;
+    try {
+      transaction = await db.transaction("write");
+      const updated = await transaction.execute({
+        sql: `UPDATE Product
+              SET country_id = ?, Prod_name = ?, Prod_price = ?, Prod_img = ?, "desc" = ?, type_id = ?, Status = ?
+              WHERE product_id = ?`,
+        args: [countryId, productName, productPrice, productImage, description, typeId, status, productId],
+      });
+      if (!updated.rowsAffected) {
+        await transaction.rollback();
+        transaction = null;
+        return res.status(404).json({ error: "Product was not found." });
+      }
+      await transaction.execute({ sql: "DELETE FROM Product_categories WHERE product_id = ?", args: [productId] });
+      for (const categoryId of categoryIds) {
+        await transaction.execute({
+          sql: "INSERT INTO Product_categories (product_id, category_id) VALUES (?, ?)",
+          args: [productId, categoryId],
+        });
+      }
+      await transaction.commit();
+      transaction = null;
+    } catch (error) {
+      if (transaction) {
+        try { await transaction.rollback(); } catch (_) { /* transaction may already be closed */ }
+      }
+      throw error;
+    }
+    await logAudit({
+      adminId: req.user.adminId,
+      type: "product_update",
+      description: `Updated ${productName} details and visibility to ${status} (Product #${productId})`,
+    });
+    res.json({ updated: true, product_id: productId, category_ids: categoryIds, status });
+  } catch (error) {
+    fail(res, error, "Unable to update product");
+  }
+});
+
+router.delete("/products/:productId", async (req, res) => {
+  const productId = Number(req.params.productId);
+  if (!Number.isInteger(productId) || productId < 1)
+    return res.status(400).json({ error: "Invalid product ID." });
+
+  let transaction;
+  try {
+    transaction = await db.transaction("write");
+    const productResult = await transaction.execute({
+      sql: "SELECT Prod_name FROM Product WHERE product_id = ? AND LOWER(COALESCE(Status, 'Shown')) <> 'deleted'",
+      args: [productId],
+    });
+    const product = productResult.rows[0];
+    if (!product) {
+      await transaction.rollback();
+      transaction = null;
+      return res.status(404).json({ error: "Product was not found." });
+    }
+
+    const deletion = await transaction.execute({
+      sql: "UPDATE Product SET Status = 'Deleted' WHERE product_id = ?",
+      args: [productId],
+    });
+    if (!deletion.rowsAffected) throw new Error("Product status was not updated");
+    await transaction.commit();
+    transaction = null;
+
+    await logAudit({
+      adminId: req.user.adminId,
+      type: "product_delete",
+      description: `Marked ${product.Prod_name || "product"} as Deleted (Product #${productId})`,
+    });
+    res.json({ deleted: true, status: "Deleted", product_id: productId });
+  } catch (error) {
+    if (transaction) {
+      try { await transaction.rollback(); } catch (_) { /* transaction may already be closed */ }
+    }
+    fail(res, error, "Unable to delete product");
   }
 });
 
@@ -544,6 +731,7 @@ router.get("/sales", async (_req, res) => {
             ) s ON s.Product_id = p.product_id
             LEFT JOIN Product_categories pc ON pc.product_id = p.product_id
             LEFT JOIN Categories c ON c.category_id = pc.category_id
+            WHERE LOWER(COALESCE(p.Status, 'Shown')) <> 'deleted'
             ORDER BY p.product_id, c.category_name`,
     });
 

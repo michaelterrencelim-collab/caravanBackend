@@ -419,7 +419,7 @@ app.post("/refundOrder", adminOnly, (req, res) =>
 function buildStockFilter(query) {
   const filter = query.filter || "all";
   const search = (query.search || "").trim();
-  const where = [];
+  const where = ["LOWER(COALESCE(p.Status, 'Shown')) <> 'deleted'"];
   const args = [];
 
   if (filter === "out-of-stock") {
@@ -457,6 +457,7 @@ app.get("/fetchStocks", adminOnly, async (req, res) => {
           COALESCE(SUM(CASE WHEN Prod_amount <= 0 THEN 1 ELSE 0 END), 0) AS out_count,
           COALESCE(SUM(CASE WHEN Prod_amount > 0 AND Prod_amount <= ? THEN 1 ELSE 0 END), 0) AS low_count
         FROM Product
+        WHERE LOWER(COALESCE(Status, 'Shown')) <> 'deleted'
       `,
       args: [LOW_STOCK_THRESHOLD],
     });

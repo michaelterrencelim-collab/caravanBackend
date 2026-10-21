@@ -167,7 +167,8 @@ router.post("/", checkAuth("user"), async (req, res) => {
                             product_id,
                             Prod_name,
                             Prod_price,
-                            Prod_amount
+                            Prod_amount,
+                            Status
                         FROM Product
                         WHERE product_id = ?
                     `,
@@ -181,6 +182,11 @@ router.post("/", checkAuth("user"), async (req, res) => {
             }
 
             const product = productResult.rows[0];
+            if (String(product.Status || "Shown").toLowerCase() !== "shown") {
+                const unavailableError = new Error(`${product.Prod_name} is no longer available to order`);
+                unavailableError.statusCode = 409;
+                throw unavailableError;
+            }
             const availableStock = Number(product.Prod_amount);
             const previousRequired = requiredStock.get(productId) || 0;
             const totalRequired = previousRequired + quantity;
