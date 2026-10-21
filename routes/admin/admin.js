@@ -138,6 +138,91 @@ router.get("/product-options", async (_req, res) => {
   }
 });
 
+router.post("/products", async (req, res) => {
+  const countryId = Number(req.body.country_id);
+  const typeId = Number(req.body.type_id);
+  const initialStock = Number(req.body.initial_stock);
+  const productName = typeof req.body.product_name === "string" ? req.body.product_name.trim() : "";
+  const productPrice = Number(req.body.product_price);
+  const productImage = typeof req.body.product_image === "string" ? req.body.product_image.trim() : "";
+  const description = typeof req.body.description === "string" ? req.body.description : "";
+  const categoryIds = Array.isArray(req.body.category_ids)
+    ? [...new Set(req.body.category_ids.map(Number))]
+    : [];
+
+  if (!Number.isInteger(countryId) || ![1, 2].includes(typeId))
+    return res.status(400).json({ error: "Choose a valid country and type." });
+  if (!productName || productName.length > 255)
+    return res.status(400).json({ error: "Product name is required and must be 255 characters or fewer." });
+  if (!Number.isFinite(productPrice) || productPrice < 0)
+    return res.status(400).json({ error: "Enter a valid non-negative price per ounce." });
+  if (!Number.isInteger(initialStock) || initialStock < 0)
+    return res.status(400).json({ error: "Initial stock must be a non-negative whole number." });
+  if (!categoryIds.length || categoryIds.some((categoryId) => !Number.isInteger(categoryId) || categoryId < 1))
+    return res.status(400).json({ error: "Choose at least one valid category." });
+  if (productImage.length > 255)
+    return res.status(400).json({ error: "Image links must be 255 characters or fewer." });
+  if (productImage) {
+    try {
+      const imageUrl = new URL(productImage);
+      if (!["http:", "https:"].includes(imageUrl.protocol)) throw new Error("Unsupported image URL protocol");
+    } catch (_) {
+      return res.status(400).json({ error: "Enter a valid HTTP or HTTPS image link." });
+    }
+  }
+
+  let transaction;
+  try {
+    const [country, type, selectedCategories] = await Promise.all([
+      db.execute({ sql: "SELECT country_id FROM Countries WHERE country_id = ?", args: [countryId] }),
+      db.execute({ sql: "SELECT type_id FROM Type WHERE type_id = ?", args: [typeId] }),
+      db.execute({
+        sql: `SELECT category_id FROM Categories WHERE category_id IN (${categoryIds.map(() => "?").join(", ")})`,
+        args: categoryIds,
+      }),
+    ]);
+    if (!country.rows.length) return res.status(400).json({ error: "Selected country was not found." });
+    if (!type.rows.length) return res.status(400).json({ error: "Selected product type was not found." });
+    if (selectedCategories.rows.length !== categoryIds.length)
+      return res.status(400).json({ error: "One or more selected categories were not found." });
+
+    transaction = await db.transaction("write");
+    const idResult = await transaction.execute({
+      sql: "SELECT COALESCE(MAX(product_id), 0) + 1 AS next_product_id FROM Product",
+    });
+    const productId = Number(idResult.rows[0]?.next_product_id);
+    if (!Number.isSafeInteger(productId) || productId < 1) throw new Error("Unable to assign a product ID.");
+
+    await transaction.execute({
+      sql: `INSERT INTO Product (
+              product_id, country_id, Prod_name, Prod_likes, Prod_price, Prod_amount,
+              Prod_img, "desc", type_id, Status
+            ) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, 'Shown')`,
+      args: [productId, countryId, productName, productPrice, initialStock, productImage, description, typeId],
+    });
+    for (const categoryId of categoryIds) {
+      await transaction.execute({
+        sql: "INSERT INTO Product_categories (product_id, category_id) VALUES (?, ?)",
+        args: [productId, categoryId],
+      });
+    }
+    await transaction.commit();
+    transaction = null;
+
+    await logAudit({
+      adminId: req.user.adminId,
+      type: "product_add",
+      description: `Added ${typeId === 2 ? "bundle" : "product"} ${productName} (Product #${productId})`,
+    });
+    res.status(201).json({ created: true, product_id: productId, status: "Shown" });
+  } catch (error) {
+    if (transaction) {
+      try { await transaction.rollback(); } catch (_) { /* transaction may already be closed */ }
+    }
+    fail(res, error, "Unable to add product");
+  }
+});
+
 router.put("/products/:productId", async (req, res) => {
   const productId = Number(req.params.productId);
   const countryId = Number(req.body.country_id);

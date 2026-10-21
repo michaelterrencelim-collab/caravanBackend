@@ -21,6 +21,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const editStatus = document.getElementById("editProductStatus");
   const statusToggle = document.getElementById("productVisibilityToggle");
   const statusLabel = document.getElementById("productVisibilityLabel");
+  const addProductButton = document.getElementById("addProductBtn");
+  const initialStockInput = document.getElementById("newProductInitialStock");
+  const currentStockDisplay = document.getElementById("editProductStock");
+  let creatingProduct = false;
   const tabs = [...document.querySelectorAll(".pr-type-tab")];
   const editDialog = document.getElementById("editProductDialog");
   const deleteDialog = document.getElementById("deleteProductDialog");
@@ -44,6 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
   countryFilterToggle.addEventListener("click", () => toggleMenu(countryFilterMenu, countryFilterToggle));
   editCountryToggle.addEventListener("click", () => toggleMenu(editCountryMenu, editCountryToggle));
   editCategoriesToggle.addEventListener("click", () => toggleMenu(editCategoriesMenu, editCategoriesToggle));
+  addProductButton.addEventListener("click", openAddDialog);
   statusToggle.addEventListener("click", () => {
     editStatus.value = editStatus.value === "Shown" ? "Hidden" : "Shown";
     statusToggle.setAttribute("aria-checked", String(editStatus.value === "Shown"));
@@ -257,7 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function readEditValues() {
-    return {
+    const values = {
       country_id: editCountry.value,
       status: editStatus.value,
       product_name: document.getElementById("editProductName").value.trim(),
@@ -267,10 +272,20 @@ document.addEventListener("DOMContentLoaded", () => {
       type_id: editForm.querySelector('input[name="type_id"]:checked')?.value || "",
       category_ids: [...editCategoriesMenu.querySelectorAll('input[type="checkbox"]:checked')].map((checkbox) => Number(checkbox.value)).sort((a, b) => a - b),
     };
+    if (creatingProduct) values.initial_stock = Number(initialStockInput.value);
+    return values;
   }
 
   function openEditDialog(product) {
+    creatingProduct = false;
     editingProduct = product;
+    document.querySelector(".pr-status-control").hidden = false;
+    document.getElementById("editProductRating").hidden = false;
+    currentStockDisplay.hidden = false;
+    initialStockInput.hidden = true;
+    initialStockInput.required = false;
+    document.getElementById("editProductStockLabel").textContent = "Current stock";
+    saveButton.textContent = "Save changes";
     document.getElementById("editProductKind").textContent = `${product.type_name || (String(product.type_id) === "2" ? "Bundle" : "Product")} details`;
     document.getElementById("editProductTitle").textContent = `Edit ${String(product.type_id) === "2" ? "bundle" : "product"}`;
     document.getElementById("editProductId").textContent = `#${product.product_id}`;
@@ -300,6 +315,42 @@ document.addEventListener("DOMContentLoaded", () => {
     editDialog.showModal();
   }
 
+  function openAddDialog() {
+    creatingProduct = true;
+    editingProduct = null;
+    closeAllMenus();
+    const typeName = activeType === "2" ? "bundle" : "product";
+    document.getElementById("editProductKind").textContent = "New listing";
+    document.getElementById("editProductTitle").textContent = `Add new ${typeName}`;
+    document.getElementById("editProductId").textContent = "Assigned on save (manual ID)";
+    currentStockDisplay.hidden = true;
+    initialStockInput.hidden = false;
+    initialStockInput.required = true;
+    initialStockInput.value = "0";
+    document.getElementById("editProductStockLabel").textContent = "Initial stock";
+    document.getElementById("editProductRating").hidden = true;
+    document.getElementById("editProductReviewCount").textContent = "No ratings yet";
+    document.querySelector(".pr-status-control").hidden = true;
+    editStatus.value = "Shown";
+    statusLabel.textContent = "Shown";
+    statusToggle.setAttribute("aria-checked", "true");
+    editCountry.value = "";
+    document.getElementById("editProductCountryLabel").textContent = "Choose a country";
+    renderCountryOptions();
+    editCategoriesMenu.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => { checkbox.checked = false; });
+    editCategoriesLabel.textContent = "Select one or more categories";
+    document.getElementById("editProductName").value = "";
+    document.getElementById("editProductPrice").value = "";
+    document.getElementById("editProductImage").value = "";
+    document.getElementById("editProductDescription").value = "";
+    editForm.querySelectorAll('input[name="type_id"]').forEach((radio) => { radio.checked = radio.value === activeType; });
+    editMessage.textContent = "";
+    saveButton.textContent = `Add ${typeName}`;
+    initialEditValues = JSON.stringify(readEditValues());
+    updateSaveState();
+    editDialog.showModal();
+  }
+
   function updateSaveState() {
     const values = readEditValues();
     saveButton.disabled = !editForm.checkValidity() || !values.country_id || !values.category_ids.length || JSON.stringify(values) === initialEditValues;
@@ -307,28 +358,54 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function saveProduct(event) {
     event.preventDefault();
-    if (!editingProduct || saveButton.disabled) return;
+    if ((!creatingProduct && !editingProduct) || saveButton.disabled) return;
     saveButton.disabled = true;
     editMessage.textContent = "Saving…";
     try {
       const values = readEditValues();
-      const response = await fetch(`/api/admin/products/${encodeURIComponent(editingProduct.product_id)}`, {
-        method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      const isCreating = creatingProduct;
+      const endpoint = isCreating ? "/api/admin/products" : `/api/admin/products/${encodeURIComponent(editingProduct.product_id)}`;
+      const response = await fetch(endpoint, {
+        method: isCreating ? "POST" : "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Unable to save changes.");
+      if (!response.ok) throw new Error(result.error || (isCreating ? "Unable to add this item." : "Unable to save changes."));
       const country = countries.find((item) => String(item.country_id) === values.country_id);
-      Object.assign(editingProduct, {
+      const savedProduct = isCreating ? {
+        product_id: Number(result.product_id),
+        product_likes: 0,
+        product_rating: 0,
+        review_count: 0,
+        stock: values.initial_stock,
+        status: "Shown",
+      } : editingProduct;
+      Object.assign(savedProduct, {
         country_id: Number(values.country_id), country: country?.country_name || "",
         product_name: values.product_name, product_price: Number(values.product_price),
         product_image: values.product_image, description: values.description,
-        status: values.status,
+        status: isCreating ? "Shown" : values.status,
         type_id: Number(values.type_id), type_name: values.type_id === "2" ? "Bundle" : "Product",
         category_ids: values.category_ids,
         categories: values.category_ids.map((id) => categories.find((category) => Number(category.category_id) === id)?.category_name).filter(Boolean),
       });
+      if (isCreating) {
+        products.unshift(savedProduct);
+        page = 1;
+        activeType = String(savedProduct.type_id);
+        tabs.forEach((tab) => {
+          const selected = tab.dataset.typeId === activeType;
+          tab.classList.toggle("is-active", selected);
+          tab.setAttribute("aria-selected", String(selected));
+        });
+        selectedCategory = "";
+        searchInput.value = "";
+        countryFilter.value = "";
+        document.getElementById("countryFilterLabel").textContent = "All countries";
+        renderCountryOptions();
+      }
       editDialog.close();
+      creatingProduct = false;
       updateTypeCopy();
       renderCategoryOptions();
       render();

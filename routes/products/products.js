@@ -2,6 +2,7 @@ const express = require("express");
 const app = express.Router();
 const path = require("path");
 const { requireAuth } = require("../../imports/token");
+const { logAudit } = require("../Audit/AuditImport");
 
 const db = require("../../imports/database");
 app.customPath = "/api";
@@ -114,46 +115,56 @@ app.get("/fetchProducts", async (req, res) => {
 
 // for adding products into database, ONLY ADMIN SIDE 
 app.post("/addProduct", requireAuth("admin"), async (req, res) => {
+  let transaction;
   try {
     const {
       country_id,
       Prod_name,
-      Prod_likes,
       Prod_price,
       Prod_amount,
       Prod_img,
       desc,
     } = req.body;
 
-    const result = await db.execute({
-      sql: `
-        INSERT INTO Product (
-          country_id,
-          Prod_name,
-          Prod_likes,
-          Prod_price,
-          Prod_amount,
-          Prod_img,
-          "desc"
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
+    transaction = await db.transaction("write");
+    const idResult = await transaction.execute({
+      sql: "SELECT COALESCE(MAX(product_id), 0) + 1 AS next_product_id FROM Product",
+    });
+    const productId = Number(idResult.rows[0]?.next_product_id);
+    if (!Number.isSafeInteger(productId) || productId < 1) throw new Error("Unable to assign a product ID");
+    await transaction.execute({
+      sql: `INSERT INTO Product (
+              product_id, country_id, Prod_name, Prod_likes, Prod_price,
+              Prod_amount, Prod_img, "desc", type_id, Status
+            ) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, 'Shown')`,
       args: [
+        productId,
         country_id,
         Prod_name,
-        Prod_likes,
         Prod_price,
         Prod_amount,
-        Prod_img,
-        desc,
+        Prod_img || "",
+        desc || "",
+        Number(req.body.type_id) === 2 ? 2 : 1,
       ],
+    });
+    await transaction.commit();
+    transaction = null;
+
+    await logAudit({
+      adminId: req.user.adminId,
+      type: "product_add",
+      description: `Added ${Number(req.body.type_id) === 2 ? "bundle" : "product"} ${Prod_name} (Product #${productId})`,
     });
 
     res.status(201).json({
       message: "Product added successfully",
-      product_id: result.lastInsertRowid,
+      product_id: productId,
     });
   } catch (error) {
+    if (transaction) {
+      try { await transaction.rollback(); } catch (_) { /* transaction may already be closed */ }
+    }
     console.error(error);
     res.status(500).json({
       error: "Failed to add product",

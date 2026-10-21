@@ -188,8 +188,12 @@
     <div class="pr-dialog-body">
       <div class="pr-readonly-grid">
         <div><span>Product ID</span><strong id="editProductId">—</strong></div>
-        <div><span>Current stock</span><strong id="editProductStock">—</strong></div>
-        <div class="pr-rating-summary">
+        <div>
+          <span id="editProductStockLabel">Current stock</span>
+          <strong id="editProductStock">—</strong>
+          <input class="pr-stock-input" id="newProductInitialStock" type="number" min="0" step="1" value="0" hidden>
+        </div>
+        <div class="pr-rating-summary" id="editProductRatingSummary">
           <span>Rating</span>
           <strong id="editProductRating">0.0</strong>
           <small id="editProductReviewCount">No reviews</small>
