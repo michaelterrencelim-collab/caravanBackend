@@ -118,6 +118,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const row = action.closest("[data-product-id]");
     const product = products.find((item) => String(item.product_id) === row?.dataset.productId);
     if (!product) return;
+    if (action.dataset.action === "visibility") {
+      setProductVisibility(product, action);
+      return;
+    }
     if (action.dataset.action === "edit") openEditDialog(product);
     if (action.dataset.action === "delete") openDeleteDialog(product);
   });
@@ -152,7 +156,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderCategoryOptions();
       render();
     } catch (error) {
-      body.innerHTML = `<tr><td colspan="7" class="products-loading">${escapeHtml(error.message)}</td></tr>`;
+      body.innerHTML = `<tr><td colspan="8" class="products-loading">${escapeHtml(error.message)}</td></tr>`;
       subtitle.textContent = "Unable to load product reports";
     }
   }
@@ -232,7 +236,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
     if (!visible.length) {
       const noun = activeType === "2" ? "bundles" : "products";
-      body.innerHTML = `<tr><td colspan="7" class="products-loading pr-empty-state">No ${noun} found.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="8" class="products-loading pr-empty-state">No ${noun} found.</td></tr>`;
     } else {
       body.innerHTML = visible.map(rowHtml).join("");
       body.querySelectorAll("img.pr-product-image").forEach((image) => image.addEventListener("error", () => { image.outerHTML = imageFallback(); }, { once: true }));
@@ -250,15 +254,40 @@ document.addEventListener("DOMContentLoaded", () => {
       ? `<img class="pr-product-image" src="${escapeHtml(imageSrc(product.product_image))}" alt="${escapeHtml(product.product_name || "Product")}">`
       : imageFallback();
     const country = product.country ? `<span class="pr-country-tag">${escapeHtml(product.country)}</span>` : "—";
+    const isShown = product.status !== "Hidden";
+    const visibilityLabel = isShown ? "Hide" : "Show";
+    const visibilityIcon = isShown
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3 21 21M10.6 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a16 16 0 0 1-3.1 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10 10 0 0 0 4-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
     return `<tr data-product-id="${escapeHtml(product.product_id)}">
-      <td><input type="checkbox" class="row-check" aria-label="Select ${escapeHtml(product.product_name)}"></td>
+      <td><button class="pr-visibility-button${isShown ? " is-shown" : " is-hidden"}" type="button" data-action="visibility" aria-label="${visibilityLabel} ${escapeHtml(product.product_name)}" title="${visibilityLabel} product">${visibilityIcon}</button></td>
       <td>${image}</td>
       <td class="pr-product-name">${escapeHtml(product.product_name || "Unnamed item")}</td>
+      <td class="pr-product-price">₱${Number(product.product_price || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       <td><div class="pr-description" tabindex="0" aria-label="Description for ${escapeHtml(product.product_name)}">${escapeHtml(product.description || "No description")}</div></td>
       <td>${categories}</td>
       <td>${country}</td>
       <td><div class="row-actions"><a href="#" class="action-edit" data-action="edit">Edit</a><a href="#" class="action-delete" data-action="delete">Delete</a></div></td>
     </tr>`;
+  }
+
+  async function setProductVisibility(product, button) {
+    const status = product.status === "Hidden" ? "Shown" : "Hidden";
+    button.disabled = true;
+    try {
+      const response = await fetch(`/api/admin/products/${encodeURIComponent(product.product_id)}/status`, {
+        method: "PATCH", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to update product visibility.");
+      product.status = result.status;
+      render();
+    } catch (error) {
+      button.disabled = false;
+      button.title = error.message;
+      button.setAttribute("aria-label", error.message);
+    }
   }
 
   function readEditValues() {

@@ -312,6 +312,28 @@ router.put("/products/:productId", async (req, res) => {
   }
 });
 
+router.patch("/products/:productId/status", async (req, res) => {
+  const productId = Number(req.params.productId);
+  const status = String(req.body.status || "");
+  if (!Number.isInteger(productId) || productId < 1 || !["Shown", "Hidden"].includes(status))
+    return res.status(400).json({ error: "A valid product ID and status (Shown or Hidden) are required." });
+  try {
+    const result = await db.execute({
+      sql: `UPDATE Product SET Status = ? WHERE product_id = ? AND LOWER(COALESCE(Status, 'Shown')) <> 'deleted'`,
+      args: [status, productId],
+    });
+    if (!result.rowsAffected) return res.status(404).json({ error: "Product was not found." });
+    await logAudit({
+      adminId: req.user.adminId,
+      type: "product_update",
+      description: `Changed product #${productId} visibility to ${status}`,
+    });
+    res.json({ product_id: productId, status });
+  } catch (error) {
+    fail(res, error, "Unable to update product visibility");
+  }
+});
+
 router.delete("/products/:productId", async (req, res) => {
   const productId = Number(req.params.productId);
   if (!Number.isInteger(productId) || productId < 1)
