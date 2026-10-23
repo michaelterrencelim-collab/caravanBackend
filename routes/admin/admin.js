@@ -473,7 +473,7 @@ router.get("/accounts", async (_req, res) => {
         sql: "SELECT Admin_id AS accountId, First_name AS first_name, Last_name AS last_name, Admin_email AS email, Account_status AS account_status, role_id FROM Admin ORDER BY Admin_id",
       }),
     ]);
-    res.json({ customers: customers.rows, admins: admins.rows });
+    res.json({ customers: customers.rows, admins: admins.rows, currentAdminEmail: req.user.email });
   } catch (error) {
     fail(res, error, "Unable to retrieve accounts");
   }
@@ -484,7 +484,7 @@ router.get("/accounts/invite-candidates", async (_req, res) => {
     const result = await db.execute({
       sql: `SELECT c.Customer_id AS accountId, c.first_name, c.last_name
             FROM Customer c
-            WHERE LOWER(COALESCE(c.Status, '')) = 'enabled'
+            WHERE LOWER(COALESCE(NULLIF(TRIM(c.Status), ''), 'enabled')) IN ('enabled', 'active')
               AND NOT EXISTS (
                 SELECT 1 FROM Admin a WHERE LOWER(a.Admin_email) = LOWER(c.Cus_email)
               )
@@ -515,7 +515,8 @@ router.post("/accounts/invitations", async (req, res) => {
     const customerResult = await db.execute({
       sql: `SELECT c.Customer_id, c.first_name, c.last_name, c.Cus_email, c.Cus_password
             FROM Customer c
-            WHERE c.Customer_id = ? AND LOWER(COALESCE(c.Status, '')) = 'enabled'
+            WHERE c.Customer_id = ?
+              AND LOWER(COALESCE(NULLIF(TRIM(c.Status), ''), 'enabled')) IN ('enabled', 'active')
               AND NOT EXISTS (
                 SELECT 1 FROM Admin a WHERE LOWER(a.Admin_email) = LOWER(c.Cus_email)
               )`,
@@ -752,10 +753,15 @@ router.put("/accounts/:kind/:accountId/status", async (req, res) => {
   try {
     if (kind === "admin" && savedStatus === "Suspended") {
       const roleResult = await db.execute({
-        sql: "SELECT role_id FROM Admin WHERE Admin_id = ?",
+        sql: "SELECT role_id, Admin_email FROM Admin WHERE Admin_id = ?",
         args: [id],
       });
       if (!roleResult.rows.length) return res.status(404).json({ error: "Account not found" });
+      const targetEmail = String(roleResult.rows[0].Admin_email || "").trim().toLowerCase();
+      const currentEmail = String(req.user.email || "").trim().toLowerCase();
+      if (id === Number(req.user.adminId) || (currentEmail && targetEmail === currentEmail)) {
+        return res.status(403).json({ error: "You cannot suspend your own admin account." });
+      }
       if (Number(roleResult.rows[0].role_id) === 1) {
         return res.status(403).json({ error: "Super Admin accounts cannot be suspended" });
       }

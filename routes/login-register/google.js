@@ -153,9 +153,10 @@ app.get("/auth/google/callback", async (req, res) => {
       last_name,
       Cus_email,
       Cus_password,
-      google_id
+      google_id,
+      Status
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, 'Enabled')
   `,
         args: [given_name || "", family_name || "", email, null, googleId],
       });

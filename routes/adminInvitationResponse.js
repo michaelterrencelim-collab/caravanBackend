@@ -75,7 +75,7 @@ router.post("/:token/respond", async (req, res) => {
       return res.json({ status: "declined", message: "You declined the Caravan admin invitation." });
     }
 
-    if (String(invitation.Customer_status || "").toLowerCase() !== "enabled") {
+    if (!["enabled", "active"].includes(String(invitation.Customer_status || "enabled").trim().toLowerCase())) {
       await transaction.execute({
         sql: "UPDATE Admin_invitations SET Status = 'customer_disabled' WHERE Invitation_id = ? AND Status = 'pending'",
         args: [invitation.Invitation_id],

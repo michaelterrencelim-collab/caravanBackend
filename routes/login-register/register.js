@@ -58,8 +58,8 @@ if (existingUser.rows.length > 0) {
 }
     const result = await db.execute({
       sql: `
-        INSERT INTO Customer (first_name, last_name, Cus_email, Cus_password)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO Customer (first_name, last_name, Cus_email, Cus_password, Status)
+        VALUES (?, ?, ?, ?, 'Enabled')
       `,
       args: [first_name, last_name, email, password],
     });

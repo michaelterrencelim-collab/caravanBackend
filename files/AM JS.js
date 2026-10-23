@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const adminBody = document.getElementById("adminBody");
   const accountData = { customer: [], admin: [] };
   const pageState = { customer: 1, admin: 1 };
+  let currentAdminEmail = "";
   const pageControls = {
     customer: { label: document.getElementById("customerPageIndicator"), previous: document.getElementById("customerPrevPage"), next: document.getElementById("customerNextPage") },
     admin: { label: document.getElementById("adminPageIndicator"), previous: document.getElementById("adminPrevPage"), next: document.getElementById("adminNextPage") },
@@ -200,6 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/api/admin/accounts", { credentials: "same-origin" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to load accounts");
+      currentAdminEmail = String(data.currentAdminEmail || "").trim().toLowerCase();
       renderCustomers(data.customers || []);
       renderAdmins(data.admins || []);
       setActiveTab(document.querySelector(".account-tab.is-active")?.dataset.tab || "customer");
@@ -238,9 +240,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const initials = `${first[0] || ""}${last[0] || ""}`.toUpperCase() || "AD";
     const roleClass = role === "Super Admin" ? "role-super-admin" : "role-admin";
     const disabled = ["suspended", "disabled"].includes(status.toLowerCase());
+    const isCurrentAdmin = String(account.email || "").trim().toLowerCase() === currentAdminEmail;
     const statusAction = status.toLowerCase() === "pending" || (isSuperAdmin && !disabled)
       ? ""
-      : `<button type="button" class="${disabled ? "action-activate" : "action-suspend"}">${disabled ? "Enable" : "Suspend"}</button>`;
+      : isCurrentAdmin && !disabled
+        ? '<button type="button" class="action-suspend" disabled aria-disabled="true" title="You cannot suspend your own admin account">Suspend</button>'
+        : `<button type="button" class="${disabled ? "action-activate" : "action-suspend"}">${disabled ? "Enable" : "Suspend"}</button>`;
     return `<tr data-kind="admin" data-account-id="${escapeHtml(account.accountId)}" data-status="${statusClass(status)}"><td><div class="name-cell"><span class="avatar avatar-teal">${escapeHtml(initials)}</span><span class="name-text">${escapeHtml(name)}</span></div></td><td><span class="pill ${roleClass}">${escapeHtml(role)}</span></td><td class="mono">${escapeHtml(account.email)}</td><td><span class="pill status-${statusClass(status)}">${escapeHtml(status)}</span></td><td><div class="account-actions"><button type="button" class="action-view">View</button>${statusAction}</div></td></tr>`;
   }
 
